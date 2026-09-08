@@ -37,4 +37,9 @@
     <string name="search_no_results">Không tìm thấy video nào phù hợp</string>
     <string name="clear_search">Xóa tìm kiếm</string>
     <string name="video_loading">Đang tải video...</string>
+    <string name="lock_controls">Khóa điều khiển</string>
+    <string name="unlock_controls">Mở khóa</string>
+    <string name="pip_mode">Thu nhỏ (PiP)</string>
+    <string name="speed_normal">Chuẩn</string>
+    <string name="action_close">Đóng</string>
 </resources>

@@ -49,6 +49,11 @@ android {
         jvmTarget = "17"
     }
 
+    lint {
+        abortOnError = true
+        disable += setOf("UnsafeOptInUsageError")
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true
