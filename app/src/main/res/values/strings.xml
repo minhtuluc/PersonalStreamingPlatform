@@ -40,6 +40,7 @@
     <string name="lock_controls">Khóa điều khiển</string>
     <string name="unlock_controls">Mở khóa</string>
     <string name="pip_mode">Thu nhỏ (PiP)</string>
+    <string name="rotate_screen">Xoay màn hình</string>
     <string name="speed_normal">Chuẩn</string>
     <string name="action_close">Đóng</string>
 

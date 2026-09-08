@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer Shield / Hexagonal Accent Ring -->
+    <path
+        android:strokeColor="#1E3A5F"
+        android:strokeWidth="1.5"
+        android:fillColor="#00000000"
+        android:pathData="M54,20 L82,34 L82,74 L54,88 L26,74 L26,34 Z" />
+
+    <!-- Letter 'L' -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M27,36 H33 V62 H41 V68 H27 Z" />
+
+    <!-- Letter 'M' with Integrated Streaming Chevron -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,36 H50 L54,52 L58,36 H64 V68 H58 V47 L55,59 H53 L50,47 V68 H44 Z" />
+
+    <!-- Letter 'T' -->
+    <path
+        android:fillColor="#00F0FF"
+        android:pathData="M67,36 H81 V42 H77 V68 H71 V42 H67 Z" />
+
+    <!-- Signature Streaming Play Triangle Accent -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M51,60 L59,64 L51,68 Z" />
+
+    <!-- Modern Stream Wave Accent Underline -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M30,73 C42,76 66,71 78,74 L78,76 C66,73 42,78 30,75 Z" />
+
+</vector>

@@ -1,7 +1,11 @@
+@file:Suppress("TooManyFunctions")
+
 package com.drivestream.app.ui.screens
 
 import android.app.Activity
 import android.app.PictureInPictureParams
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.os.Build
 import android.util.Rational
 import android.view.ViewGroup
@@ -23,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -36,6 +41,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
@@ -150,6 +156,7 @@ fun PlayerScreen(
                 if (currentWindow != null) {
                     WindowCompat.getInsetsController(currentWindow, view).show(WindowInsetsCompat.Type.systemBars())
                 }
+                (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
             viewModel.saveCurrentPosition()
         }
@@ -240,6 +247,9 @@ fun PlayerScreen(
                 onToggleLock = { viewModel.toggleLock() },
                 onEnterPip = {
                     enterPictureInPicture(context as? Activity)
+                },
+                onToggleOrientation = {
+                    toggleScreenOrientation(context as? Activity)
                 }
             )
         }
@@ -265,12 +275,14 @@ private fun PlayerControlsOverlay(
     onSeekTo: (Long) -> Unit,
     onSpeedChange: (Float) -> Unit,
     onToggleLock: () -> Unit,
-    onEnterPip: () -> Unit
+    onEnterPip: () -> Unit,
+    onToggleOrientation: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.55f))
+            .safeDrawingPadding()
             .padding(16.dp)
     ) {
         if (uiState.isLocked) {
@@ -298,6 +310,7 @@ private fun PlayerControlsOverlay(
                 onToggleLock = onToggleLock,
                 onSpeedChange = onSpeedChange,
                 onEnterPip = onEnterPip,
+                onToggleOrientation = onToggleOrientation,
                 modifier = Modifier.align(Alignment.TopCenter)
             )
 
@@ -329,6 +342,7 @@ private fun PlayerTopBar(
     onToggleLock: () -> Unit,
     onSpeedChange: (Float) -> Unit,
     onEnterPip: () -> Unit,
+    onToggleOrientation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isSpeedMenuOpen by remember { mutableStateOf(false) }
@@ -398,6 +412,15 @@ private fun PlayerTopBar(
                 Icon(
                     imageVector = Icons.Default.PictureInPictureAlt,
                     contentDescription = stringResource(R.string.pip_mode),
+                    tint = TextPrimary
+                )
+            }
+
+            // Rotate Screen Button
+            IconButton(onClick = onToggleOrientation) {
+                Icon(
+                    imageVector = Icons.Default.ScreenRotation,
+                    contentDescription = stringResource(R.string.rotate_screen),
                     tint = TextPrimary
                 )
             }
@@ -601,4 +624,14 @@ private fun enterPictureInPicture(activity: Activity?) {
         .setAspectRatio(Rational(PIP_RATIO_NUMERATOR, PIP_RATIO_DENOMINATOR))
         .build()
     activity.enterPictureInPictureMode(params)
+}
+
+private fun toggleScreenOrientation(activity: Activity?) {
+    if (activity == null) return
+    val current = activity.resources.configuration.orientation
+    activity.requestedOrientation = if (current == Configuration.ORIENTATION_LANDSCAPE) {
+        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    } else {
+        ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    }
 }
