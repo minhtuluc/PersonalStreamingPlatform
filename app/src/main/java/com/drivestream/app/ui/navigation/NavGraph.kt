@@ -83,7 +83,10 @@ fun NavGraph(
 
         composable<Screen.Downloads> {
             DownloadsScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onPlayVideo = { fileId, title ->
+                    navController.navigate(Screen.Player(fileId = fileId, title = title))
+                }
             )
         }
     }

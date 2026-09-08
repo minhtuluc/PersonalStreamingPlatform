@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivestream.app.R
+import com.drivestream.app.data.model.DriveFile
 import com.drivestream.app.ui.browser.DriveUiState
 import com.drivestream.app.ui.browser.DriveViewModel
 import com.drivestream.app.ui.components.FolderCard
@@ -149,6 +150,7 @@ fun BrowserScreen(
                         uiState = uiState,
                         onFolderClick = onFolderClick,
                         onVideoClick = onVideoClick,
+                        onDownloadClick = { file -> viewModel.downloadVideo(file) },
                         onLoadMore = { viewModel.loadNextPage() }
                     )
                 }
@@ -255,6 +257,7 @@ private fun BrowserFileList(
     uiState: DriveUiState,
     onFolderClick: (String, String) -> Unit,
     onVideoClick: (String, String) -> Unit,
+    onDownloadClick: (DriveFile) -> Unit,
     onLoadMore: () -> Unit
 ) {
     val listState = rememberLazyListState()
@@ -291,7 +294,8 @@ private fun BrowserFileList(
             } else {
                 VideoCard(
                     video = file,
-                    onClick = { onVideoClick(file.id, file.name) }
+                    onClick = { onVideoClick(file.id, file.name) },
+                    onDownloadClick = { onDownloadClick(file) }
                 )
             }
         }

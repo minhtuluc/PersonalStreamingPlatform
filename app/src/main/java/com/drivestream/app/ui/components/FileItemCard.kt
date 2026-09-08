@@ -18,10 +18,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,12 +35,14 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.drivestream.app.R
 import com.drivestream.app.data.model.DriveFile
 import com.drivestream.app.ui.theme.AccentBlue
 import com.drivestream.app.ui.theme.AccentTeal
@@ -126,7 +130,8 @@ fun FolderCard(
 fun VideoCard(
     video: DriveFile,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDownloadClick: (() -> Unit)? = null
 ) {
     Card(
         modifier = modifier
@@ -191,6 +196,16 @@ fun VideoCard(
                             color = TextSecondary
                         )
                     }
+                }
+            }
+
+            if (onDownloadClick != null) {
+                IconButton(onClick = onDownloadClick) {
+                    Icon(
+                        imageVector = Icons.Default.FileDownload,
+                        contentDescription = stringResource(R.string.action_download),
+                        tint = AccentBlue
+                    )
                 }
             }
         }

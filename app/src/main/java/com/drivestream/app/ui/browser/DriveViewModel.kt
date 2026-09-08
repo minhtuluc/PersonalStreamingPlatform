@@ -3,7 +3,9 @@ package com.drivestream.app.ui.browser
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.drivestream.app.data.DownloadRepository
 import com.drivestream.app.data.DriveRepository
+import com.drivestream.app.data.model.DriveFile
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -17,7 +19,8 @@ import javax.inject.Inject
 @HiltViewModel
 class DriveViewModel @Inject constructor(
     private val driveRepository: DriveRepository,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    private val downloadRepository: DownloadRepository? = null
 ) : ViewModel() {
 
     private val folderId: String = savedStateHandle.get<String>("folderId") ?: DEFAULT_FOLDER_ID
@@ -186,6 +189,12 @@ class DriveViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    fun downloadVideo(file: DriveFile) {
+        viewModelScope.launch {
+            downloadRepository?.enqueueDownload(file.id, file.name, file.size)
+        }
     }
 
     companion object {

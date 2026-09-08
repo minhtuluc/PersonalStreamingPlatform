@@ -13,7 +13,9 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.LoadControl
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.drivestream.app.data.DownloadRepository
 import com.drivestream.app.data.PlayerRepository
 import com.drivestream.app.player.GDriveDataSourceFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 @Suppress("TooManyFunctions")
@@ -34,6 +37,7 @@ class PlayerViewModel @Inject constructor(
     private val gDriveDataSourceFactory: GDriveDataSourceFactory,
     private val loadControl: LoadControl,
     private val playerRepository: PlayerRepository,
+    private val downloadRepository: DownloadRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -60,7 +64,8 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun createExoPlayer(): ExoPlayer {
-        val mediaSourceFactory = DefaultMediaSourceFactory(gDriveDataSourceFactory)
+        val dataSourceFactory = DefaultDataSource.Factory(context, gDriveDataSourceFactory)
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
@@ -120,7 +125,12 @@ class PlayerViewModel @Inject constructor(
 
         viewModelScope.launch {
             val savedPosition = playerRepository.getSavedPosition(fileId)
-            val mediaItem = MediaItem.fromUri(Uri.parse("gdrive://$fileId"))
+            val downloadedVideo = downloadRepository.getCompletedDownload(fileId)
+            val mediaItem = if (downloadedVideo != null) {
+                MediaItem.fromUri(Uri.fromFile(File(downloadedVideo.localPath)))
+            } else {
+                MediaItem.fromUri(Uri.parse("gdrive://$fileId"))
+            }
             player.setMediaItem(mediaItem)
             player.prepare()
             if (savedPosition > 0L) {

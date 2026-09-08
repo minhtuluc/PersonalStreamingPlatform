@@ -42,4 +42,19 @@
     <string name="pip_mode">Thu nhỏ (PiP)</string>
     <string name="speed_normal">Chuẩn</string>
     <string name="action_close">Đóng</string>
+
+    <!-- Download & Storage -->
+    <string name="download_started">Bắt đầu tải video</string>
+    <string name="download_paused">Đã tạm dừng tải</string>
+    <string name="download_completed">Tải hoàn tất</string>
+    <string name="download_failed">Tải thất bại</string>
+    <string name="download_queued">Đang chờ trong hàng đợi</string>
+    <string name="storage_used">Đã dùng: %1$s</string>
+    <string name="storage_available">Trống: %1$s</string>
+    <string name="storage_title">Dung lượng bộ nhớ</string>
+    <string name="error_insufficient_storage">Bộ nhớ máy không đủ dung lượng để tải video này</string>
+    <string name="confirm_delete_download">Bạn có chắc muốn xóa video này khỏi máy?</string>
+    <string name="download_notification_channel_name">Tiến trình tải video</string>
+    <string name="download_notification_channel_desc">Hiển thị thanh tiến trình khi tải video từ Google Drive</string>
+    <string name="download_in_progress">Đang tải: %1$s</string>
 </resources>

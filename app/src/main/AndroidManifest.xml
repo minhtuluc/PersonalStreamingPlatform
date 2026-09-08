@@ -40,6 +40,11 @@
             </intent-filter>
         </activity>
 
+        <service
+            android:name=".download.DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
     </application>
 
 </manifest>
