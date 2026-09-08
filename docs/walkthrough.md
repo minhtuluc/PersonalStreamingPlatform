@@ -1,8 +1,9 @@
 # Walkthrough – Sprint 1: Authentication & Token Management 🔐
 
 > **Sprint:** Sprint 1: Authentication & Token Management  
-> **Status:** ✅ **COMPLETED – Ready for QA / QC Review**  
-> **Branch / Environment:** Android Jetpack Compose, Hilt DI, EncryptedSharedPreferences, OpenJDK 21, Android SDK 34/35
+> **Status:** ✅ **COMPLETED & VERIFIED – QC Passed & Pushed to GitHub**  
+> **Branch / Remote:** `main` → `https://github.com/minhtuluc/PersonalStreamingPlatform.git`  
+> **Environment:** Android Jetpack Compose, Hilt DI, EncryptedSharedPreferences, OpenJDK 21, Android SDK 34/35
 
 ---
 
@@ -14,7 +15,7 @@
 | **S1-02** | `TokenManager` – Encrypted Storage | `EncryptedTokenStorage` sử dụng `EncryptedSharedPreferences` với phần cứng AES-256 (`AES256_GCM`). | ✅ COMPLETED | [TokenStorage.kt](file:///c:/Users/tumin/OneDrive/Documents/STREAMING/app/src/main/java/com/drivestream/app/auth/TokenStorage.kt) |
 | **S1-03** | `TokenManager` – Proactive Refresh | Tự động kích hoạt refresh khi thời gian sống token còn `< 300s` (5 phút), đảm bảo streaming không bao giờ bị ngắt quãng giữa chừng. | ✅ COMPLETED | [TokenManager.kt](file:///c:/Users/tumin/OneDrive/Documents/STREAMING/app/src/main/java/com/drivestream/app/auth/TokenManager.kt) |
 | **S1-04** | `TokenManager` – Concurrent Dedup | Mutex double-checked locking: Khi có 5-10 coroutine đồng thời yêu cầu token, chỉ có đúng **1** network call thực tế diễn ra. | ✅ COMPLETED | [TokenManagerTest.kt](file:///c:/Users/tumin/OneDrive/Documents/STREAMING/app/src/test/java/com/drivestream/app/auth/TokenManagerTest.kt) |
-| **S1-05** | `TokenInterceptor` – Bearer Injection | OkHttp Interceptor tự động gắn header `Authorization: Bearer <validAccessToken>` vào mọi outbound call. | ✅ COMPLETED | [TokenInterceptor.kt](file:///c:/Users/tumin/OneDrive/Documents/STREAMING/app/src/main/java/com/drivestream/app/network/TokenInterceptor.kt) |
+| **S1-05** | `TokenInterceptor` – Bearer Injection | OkHttp Interceptor tự động gắn header `Authorization: Bearer <validAccessToken>` vào mọi outbound call đến Google domains. | ✅ COMPLETED | [TokenInterceptor.kt](file:///c:/Users/tumin/OneDrive/Documents/STREAMING/app/src/main/java/com/drivestream/app/network/TokenInterceptor.kt) |
 | **S1-06** | `TokenInterceptor` – 401 Retry | Bắt mã HTTP 401 Unauthorized từ Google Drive API, tự động refresh token và retry request đúng 1 lần. | ✅ COMPLETED | [TokenInterceptorTest.kt](file:///c:/Users/tumin/OneDrive/Documents/STREAMING/app/src/test/java/com/drivestream/app/network/TokenInterceptorTest.kt) |
 | **S1-07** | `LoginScreen` & `AuthViewModel` | Giao diện Material 3 Dark Luxury (nút Sign-In Google, loading spinner, error banner) kết nối `AuthViewModel` theo kiến trúc MVVM + UDF. | ✅ COMPLETED | [LoginScreen.kt](file:///c:/Users/tumin/OneDrive/Documents/STREAMING/app/src/main/java/com/drivestream/app/ui/screens/LoginScreen.kt), [AuthViewModel.kt](file:///c:/Users/tumin/OneDrive/Documents/STREAMING/app/src/main/java/com/drivestream/app/auth/AuthViewModel.kt) |
 | **S1-08** | Auth State Persistence | `MainActivity` và `AuthViewModel` tự động khôi phục session đã lưu từ EncryptedSharedPreferences lúc mở app. | ✅ COMPLETED | [MainActivity.kt](file:///c:/Users/tumin/OneDrive/Documents/STREAMING/app/src/main/java/com/drivestream/app/MainActivity.kt) |
@@ -25,8 +26,6 @@
 ## 2. Testing & Quality Verification
 
 ### 2.1 Automated Unit Test Suites
-Tất cả các test suite độc lập kiểm thử các kịch bản nghiêm ngặt nhất:
-
 1. **`TokenManagerTest.kt`**:
    - `returns existing valid token when remaining lifetime is well above 300s` -> PASS
    - `proactively triggers refresh when remaining lifetime is less than 300s` -> PASS
@@ -68,6 +67,17 @@ Tất cả các test suite độc lập kiểm thử các kịch bản nghiêm n
 
 ---
 
-## 4. Bàn Giao Kiểm Soát Chất Lượng (Quality Control Gate)
+## 4. Hardening & Senior QC Approval
 
-Theo đúng quy trình kỷ luật sản phẩm, **tiến trình coding agent dừng lại tại đây**. Kính chuyển toàn bộ source code và kết quả kiểm thử Sprint 1 cho bên Kiểm soát Chất lượng (QC) vào review, đánh giá trước khi mở khóa **Sprint 2: Drive File Browser 📁**.
+- **Lọc Domain an toàn:** `TokenInterceptor` chỉ gửi Bearer token đến `*.googleapis.com`, `*.googleusercontent.com` hoặc local mock server.
+- **Khôi phục lỗi Keystore hỏng:** `EncryptedTokenStorage` tự động dọn dẹp file prefs hỏng và tái tạo bộ nhớ mã hóa khi Keystore OEM bị corrupt.
+- **Báo cáo QC:** Chi tiết tại [sprint1_qc_review.md](file:///C:/Users/tumin/.gemini/antigravity-ide/brain/930b13ae-c5d2-48b1-bb3e-d2952afc2a21/sprint1_qc_review.md) với kết luận: **🟢 PASS (100% Tiêu Chuẩn)**.
+
+---
+
+## 5. Git Repository & Initial Push 🚀
+
+- **Remote URL:** `https://github.com/minhtuluc/PersonalStreamingPlatform.git`
+- **Default Branch:** `main`
+- **Initial Commit:** `648d67c` (`feat(auth): complete Sprint 0 foundation and Sprint 1 authentication & token management`)
+- **Pushed Status:** Up-to-date with `origin/main`, clean working tree.
