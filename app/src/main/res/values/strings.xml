@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">DriveStream</string>
+    <string name="login_title">DriveStream</string>
+    <string name="login_subtitle">Stream video từ Google Drive ở chất lượng gốc</string>
+    <string name="sign_in_with_google">Đăng nhập bằng Google</string>
+    <string name="sign_out">Đăng xuất</string>
+    <string name="signing_in">Đang đăng nhập...</string>
+    <string name="error_sign_in_failed">Đăng nhập thất bại. Vui lòng thử lại.</string>
+
+    <!-- Navigation & Titles -->
+    <string name="nav_home">Trang chủ</string>
+    <string name="nav_browser">Duyệt Drive</string>
+    <string name="nav_downloads">Đã tải</string>
+    <string name="continue_watching">Tiếp tục xem</string>
+    <string name="recently_viewed">Xem gần đây</string>
+    <string name="downloaded_videos">Video đã tải</string>
+    <string name="browse_drive">Duyệt Drive</string>
+    <string name="empty_folder">Thư mục trống</string>
+    <string name="no_downloads">Chưa có video nào được tải về</string>
+    <string name="no_continue_watching">Chưa có video nào đang xem dở</string>
+
+    <!-- Actions -->
+    <string name="action_retry">Thử lại</string>
+    <string name="action_refresh">Làm mới</string>
+    <string name="action_delete">Xóa</string>
+    <string name="action_download">Tải về</string>
+    <string name="action_pause">Tạm dừng</string>
+    <string name="action_resume">Tiếp tục</string>
+    <string name="action_cancel">Hủy</string>
+
+    <!-- Player -->
+    <string name="buffering">Đang tải...</string>
+    <string name="playback_speed">Tốc độ phát</string>
+    <string name="rewind_10s">Tua lại 10s</string>
+    <string name="forward_30s">Tua tiếp 30s</string>
+</resources>
