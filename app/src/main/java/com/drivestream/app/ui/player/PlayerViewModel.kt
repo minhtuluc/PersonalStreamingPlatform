@@ -15,9 +15,11 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.LoadControl
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.navigation.toRoute
 import com.drivestream.app.data.DownloadRepository
 import com.drivestream.app.data.PlayerRepository
 import com.drivestream.app.player.GDriveDataSourceFactory
+import com.drivestream.app.ui.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
@@ -41,13 +43,17 @@ class PlayerViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    val fileId: String = savedStateHandle.get<String>("fileId") ?: ""
-    val title: String = savedStateHandle.get<String>("title") ?: ""
+    private val route = runCatching { savedStateHandle.toRoute<Screen.Player>() }.getOrNull()
+    private var _fileId: String = route?.fileId ?: savedStateHandle.get<String>("fileId").orEmpty()
+    private var _title: String = Uri.decode(route?.title ?: savedStateHandle.get<String>("title").orEmpty())
+
+    val fileId: String get() = _fileId
+    val title: String get() = _title
 
     private val _uiState = MutableStateFlow(
         PlayerUiState(
-            fileId = fileId,
-            title = title,
+            fileId = _fileId,
+            title = _title,
             isLoading = true
         )
     )
@@ -76,7 +82,6 @@ class PlayerViewModel @Inject constructor(
             .setLoadControl(loadControl)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
-            .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
     }
 
@@ -123,13 +128,30 @@ class PlayerViewModel @Inject constructor(
             }
         })
 
+        if (_fileId.isNotBlank()) {
+            startPlayback()
+        }
+    }
+
+    fun initialize(incomingFileId: String, incomingTitle: String) {
+        val decodedTitle = Uri.decode(incomingTitle)
+        if (_fileId.isBlank() && incomingFileId.isNotBlank()) {
+            _fileId = incomingFileId
+            _title = decodedTitle
+            _uiState.update { it.copy(fileId = incomingFileId, title = decodedTitle) }
+            startPlayback()
+        }
+    }
+
+    private fun startPlayback() {
+        if (_fileId.isBlank()) return
         viewModelScope.launch {
-            val savedPosition = playerRepository.getSavedPosition(fileId)
-            val downloadedVideo = downloadRepository.getCompletedDownload(fileId)
+            val savedPosition = playerRepository.getSavedPosition(_fileId)
+            val downloadedVideo = downloadRepository.getCompletedDownload(_fileId)
             val mediaItem = if (downloadedVideo != null) {
                 MediaItem.fromUri(Uri.fromFile(File(downloadedVideo.localPath)))
             } else {
-                MediaItem.fromUri(Uri.parse("gdrive://$fileId"))
+                MediaItem.fromUri(Uri.parse("gdrive://$_fileId"))
             }
             player.setMediaItem(mediaItem)
             player.prepare()
@@ -237,11 +259,11 @@ class PlayerViewModel @Inject constructor(
     fun saveCurrentPosition() {
         val position = player.currentPosition
         val duration = player.duration
-        if (position > 0L && duration > 0L) {
+        if (position > 0L && duration > 0L && _fileId.isNotBlank()) {
             viewModelScope.launch {
                 playerRepository.savePlaybackPosition(
-                    fileId = fileId,
-                    fileName = title,
+                    fileId = _fileId,
+                    fileName = _title,
                     positionMs = position,
                     durationMs = duration
                 )

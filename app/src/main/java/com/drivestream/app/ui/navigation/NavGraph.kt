@@ -1,5 +1,6 @@
 package com.drivestream.app.ui.navigation
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -47,7 +48,7 @@ fun NavGraph(
                     navController.navigate(Screen.Downloads)
                 },
                 onPlayVideo = { fileId, title ->
-                    navController.navigate(Screen.Player(fileId = fileId, title = title))
+                    navController.navigate(Screen.Player(fileId = fileId, title = Uri.encode(title)))
                 },
                 onSignOut = {
                     authViewModel.signOut()
@@ -62,15 +63,15 @@ fun NavGraph(
             val route = backStackEntry.toRoute<Screen.Browser>()
             BrowserScreen(
                 folderId = route.folderId,
-                folderName = route.folderName,
+                folderName = Uri.decode(route.folderName),
                 onNavigateBack = { navController.popBackStack() },
                 onFolderClick = { subFolderId, subFolderName ->
                     navController.navigate(
-                        Screen.Browser(folderId = subFolderId, folderName = subFolderName)
+                        Screen.Browser(folderId = subFolderId, folderName = Uri.encode(subFolderName))
                     )
                 },
                 onVideoClick = { fileId, title ->
-                    navController.navigate(Screen.Player(fileId = fileId, title = title))
+                    navController.navigate(Screen.Player(fileId = fileId, title = Uri.encode(title)))
                 }
             )
         }
@@ -79,7 +80,7 @@ fun NavGraph(
             val route = backStackEntry.toRoute<Screen.Player>()
             PlayerScreen(
                 fileId = route.fileId,
-                title = route.title,
+                title = Uri.decode(route.title),
                 onNavigateBack = { navController.popBackStack() }
             )
         }
@@ -88,7 +89,7 @@ fun NavGraph(
             DownloadsScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onPlayVideo = { fileId, title ->
-                    navController.navigate(Screen.Player(fileId = fileId, title = title))
+                    navController.navigate(Screen.Player(fileId = fileId, title = Uri.encode(title)))
                 }
             )
         }

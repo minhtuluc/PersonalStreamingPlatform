@@ -129,19 +129,27 @@ fun PlayerScreen(
     val context = LocalContext.current
     val view = LocalView.current
 
+    LaunchedEffect(fileId, title) {
+        viewModel.initialize(fileId, title)
+    }
+
     // Immersive Fullscreen Mode
     DisposableEffect(view) {
-        val window = (context as? Activity)?.window
-        if (window != null) {
-            val insetsController = WindowCompat.getInsetsController(window, view)
-            insetsController.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            insetsController.hide(WindowInsetsCompat.Type.systemBars())
+        runCatching {
+            val window = (context as? Activity)?.window
+            if (window != null) {
+                val insetsController = WindowCompat.getInsetsController(window, view)
+                insetsController.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                insetsController.hide(WindowInsetsCompat.Type.systemBars())
+            }
         }
         onDispose {
-            val currentWindow = (context as? Activity)?.window
-            if (currentWindow != null) {
-                WindowCompat.getInsetsController(currentWindow, view).show(WindowInsetsCompat.Type.systemBars())
+            runCatching {
+                val currentWindow = (context as? Activity)?.window
+                if (currentWindow != null) {
+                    WindowCompat.getInsetsController(currentWindow, view).show(WindowInsetsCompat.Type.systemBars())
+                }
             }
             viewModel.saveCurrentPosition()
         }
