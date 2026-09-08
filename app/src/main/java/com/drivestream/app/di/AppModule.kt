@@ -48,4 +48,12 @@ object AppModule {
             .retryOnConnectionFailure(true)
             .build()
     }
+
+    @Provides
+    @Singleton
+    fun provideJson(): kotlinx.serialization.json.Json = kotlinx.serialization.json.Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        encodeDefaults = true
+    }
 }

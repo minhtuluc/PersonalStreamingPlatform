@@ -1,0 +1,196 @@
+package com.drivestream.app.ui.browser
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.drivestream.app.data.DriveRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class DriveViewModel @Inject constructor(
+    private val driveRepository: DriveRepository,
+    savedStateHandle: SavedStateHandle
+) : ViewModel() {
+
+    private val folderId: String = savedStateHandle.get<String>("folderId") ?: DEFAULT_FOLDER_ID
+    private val folderName: String = savedStateHandle.get<String>("folderName") ?: DEFAULT_FOLDER_NAME
+
+    private val _uiState = MutableStateFlow(
+        DriveUiState(
+            folderId = folderId,
+            folderName = folderName,
+            isLoading = true
+        )
+    )
+    val uiState: StateFlow<DriveUiState> = _uiState.asStateFlow()
+
+    private var searchJob: Job? = null
+
+    init {
+        loadFolderFiles(forceRefresh = false)
+    }
+
+    fun loadFolderFiles(forceRefresh: Boolean = false) {
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isLoading = !forceRefresh && it.files.isEmpty(),
+                    isRefreshing = forceRefresh,
+                    errorMessage = null
+                )
+            }
+
+            val result = driveRepository.getFolderFiles(
+                folderId = folderId,
+                pageToken = null,
+                forceRefresh = forceRefresh
+            )
+
+            result.fold(
+                onSuccess = { fileList ->
+                    _uiState.update {
+                        it.copy(
+                            files = fileList.files,
+                            nextPageToken = fileList.nextPageToken,
+                            isLoading = false,
+                            isRefreshing = false,
+                            errorMessage = null
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            errorMessage = error.localizedMessage ?: "Failed to load files"
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun loadNextPage() {
+        val currentState = _uiState.value
+        val token = currentState.nextPageToken
+        if (token == null || currentState.isLoadingMore || currentState.isLoading) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMore = true) }
+
+            val result = if (currentState.isSearching && currentState.searchQuery.isNotBlank()) {
+                driveRepository.searchVideos(
+                    query = currentState.searchQuery,
+                    pageToken = token
+                )
+            } else {
+                driveRepository.getFolderFiles(
+                    folderId = folderId,
+                    pageToken = token,
+                    forceRefresh = false
+                )
+            }
+
+            result.fold(
+                onSuccess = { fileList ->
+                    _uiState.update {
+                        it.copy(
+                            files = it.files + fileList.files,
+                            nextPageToken = fileList.nextPageToken,
+                            isLoadingMore = false
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isLoadingMore = false,
+                            errorMessage = error.localizedMessage ?: "Failed to load more files"
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun onSearchQueryChange(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+        searchJob?.cancel()
+
+        if (query.isBlank()) {
+            _uiState.update { it.copy(isSearching = false) }
+            loadFolderFiles(forceRefresh = false)
+            return
+        }
+
+        searchJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            executeSearch(query)
+        }
+    }
+
+    private suspend fun executeSearch(query: String) {
+        _uiState.update { it.copy(isSearching = true, isLoading = true, errorMessage = null) }
+        val result = driveRepository.searchVideos(query = query)
+        result.fold(
+            onSuccess = { fileList ->
+                _uiState.update {
+                    it.copy(
+                        files = fileList.files,
+                        nextPageToken = fileList.nextPageToken,
+                        isLoading = false,
+                        errorMessage = null
+                    )
+                }
+            },
+            onFailure = { error ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = error.localizedMessage ?: "Search failed"
+                    )
+                }
+            }
+        )
+    }
+
+    fun refresh() {
+        if (_uiState.value.isSearching && _uiState.value.searchQuery.isNotBlank()) {
+            viewModelScope.launch {
+                executeSearch(_uiState.value.searchQuery)
+            }
+        } else {
+            loadFolderFiles(forceRefresh = true)
+        }
+    }
+
+    fun clearSearch() {
+        searchJob?.cancel()
+        _uiState.update {
+            it.copy(
+                searchQuery = "",
+                isSearching = false
+            )
+        }
+        loadFolderFiles(forceRefresh = false)
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    companion object {
+        const val DEFAULT_FOLDER_ID = "root"
+        const val DEFAULT_FOLDER_NAME = "My Drive"
+        const val SEARCH_DEBOUNCE_MS = 400L
+    }
+}

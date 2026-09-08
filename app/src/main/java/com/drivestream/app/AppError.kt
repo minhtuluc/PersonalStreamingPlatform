@@ -70,4 +70,14 @@ sealed class AppError(
         severity = ErrorSeverity.MEDIUM,
         cause = cause
     )
+
+    companion object {
+        fun fromThrowable(throwable: Throwable): AppError {
+            return when (throwable) {
+                is AppError -> throwable
+                is java.io.IOException -> NetworkUnavailable(throwable)
+                else -> ServerError(statusCode = -1, cause = throwable)
+            }
+        }
+    }
 }

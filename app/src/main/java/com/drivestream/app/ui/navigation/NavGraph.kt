@@ -61,6 +61,11 @@ fun NavGraph(
                 folderId = route.folderId,
                 folderName = route.folderName,
                 onNavigateBack = { navController.popBackStack() },
+                onFolderClick = { subFolderId, subFolderName ->
+                    navController.navigate(
+                        Screen.Browser(folderId = subFolderId, folderName = subFolderName)
+                    )
+                },
                 onVideoClick = { fileId, title ->
                     navController.navigate(Screen.Player(fileId = fileId, title = title))
                 }

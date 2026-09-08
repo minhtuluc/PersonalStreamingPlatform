@@ -33,4 +33,8 @@
     <string name="playback_speed">Tốc độ phát</string>
     <string name="rewind_10s">Tua lại 10s</string>
     <string name="forward_30s">Tua tiếp 30s</string>
+    <string name="search_drive">Tìm kiếm video...</string>
+    <string name="search_no_results">Không tìm thấy video nào phù hợp</string>
+    <string name="clear_search">Xóa tìm kiếm</string>
+    <string name="video_loading">Đang tải video...</string>
 </resources>
