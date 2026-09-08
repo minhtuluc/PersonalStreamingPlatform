@@ -23,6 +23,7 @@ class DriveRemoteDataSource @Inject constructor(
     private val okHttpClient: OkHttpClient,
     private val json: Json,
     private val rateLimiter: RateLimiter,
+    private val circuitBreaker: CircuitBreaker = CircuitBreaker(),
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) {
 
@@ -34,8 +35,10 @@ class DriveRemoteDataSource @Inject constructor(
         pageSize: Int = DEFAULT_PAGE_SIZE
     ): Result<DriveFileList> = withContext(ioDispatcher) {
         runCatching {
-            rateLimiter.executeWithRetry {
-                executeListRequest(folderId = folderId, pageToken = pageToken, pageSize = pageSize)
+            circuitBreaker.execute {
+                rateLimiter.executeWithRetry {
+                    executeListRequest(folderId = folderId, pageToken = pageToken, pageSize = pageSize)
+                }
             }
         }.fold(
             onSuccess = { Result.success(it) },
@@ -49,8 +52,10 @@ class DriveRemoteDataSource @Inject constructor(
         pageSize: Int = DEFAULT_PAGE_SIZE
     ): Result<DriveFileList> = withContext(ioDispatcher) {
         runCatching {
-            rateLimiter.executeWithRetry {
-                executeSearchRequest(query = query, pageToken = pageToken, pageSize = pageSize)
+            circuitBreaker.execute {
+                rateLimiter.executeWithRetry {
+                    executeSearchRequest(query = query, pageToken = pageToken, pageSize = pageSize)
+                }
             }
         }.fold(
             onSuccess = { Result.success(it) },

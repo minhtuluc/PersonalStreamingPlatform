@@ -17,3 +17,7 @@
 # Prevent stripping of line numbers for crash reporting
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# Apache HTTP client transitive dependencies in Google API Client
+-dontwarn javax.naming.**
+-dontwarn org.ietf.jgss.**

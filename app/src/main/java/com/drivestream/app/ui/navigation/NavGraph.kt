@@ -46,6 +46,9 @@ fun NavGraph(
                 onNavigateToDownloads = {
                     navController.navigate(Screen.Downloads)
                 },
+                onPlayVideo = { fileId, title ->
+                    navController.navigate(Screen.Player(fileId = fileId, title = title))
+                },
                 onSignOut = {
                     authViewModel.signOut()
                     navController.navigate(Screen.Login) {

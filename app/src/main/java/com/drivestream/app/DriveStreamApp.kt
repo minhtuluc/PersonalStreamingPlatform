@@ -5,6 +5,10 @@ import android.os.StrictMode
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import dagger.hilt.android.HiltAndroidApp
+import com.drivestream.app.maintenance.HousekeepingManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import timber.log.Timber
 import javax.inject.Inject
@@ -14,6 +18,9 @@ class DriveStreamApp : Application(), ImageLoaderFactory {
 
     @Inject
     lateinit var okHttpClient: OkHttpClient
+
+    @Inject
+    lateinit var housekeepingManager: HousekeepingManager
 
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
@@ -28,6 +35,18 @@ class DriveStreamApp : Application(), ImageLoaderFactory {
         initLogging()
         initStrictMode()
         initCrashHandler()
+        initHousekeeping()
+    }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun initHousekeeping() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                housekeepingManager.performDailyCleanup()
+            } catch (e: Exception) {
+                Timber.e(e, "[HOUSEKEEPING] Cleanup failed")
+            }
+        }
     }
 
     private fun initLogging() {
