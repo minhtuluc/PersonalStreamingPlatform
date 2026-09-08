@@ -169,4 +169,59 @@ class DriveRemoteDataSourceTest {
         val recordedRequest = mockWebServer.takeRequest()
         assertThat(recordedRequest.requestUrl?.queryParameter("q")).contains("Oppenheimer")
     }
+
+    @Test
+    @DisplayName("listFiles correctly resolves folder and video shortcuts")
+    fun listFilesShortcutSupport() = runTest {
+        val mockJson = """
+            {
+                "files": [
+                    {
+                        "id": "shortcut_folder",
+                        "name": "PC Movies Shortcut",
+                        "mimeType": "application/vnd.google-apps.shortcut",
+                        "shortcutDetails": {
+                            "targetId": "real_target_folder_123",
+                            "targetMimeType": "application/vnd.google-apps.folder"
+                        }
+                    },
+                    {
+                        "id": "shortcut_video",
+                        "name": "Avatar.mp4",
+                        "mimeType": "application/vnd.google-apps.shortcut",
+                        "shortcutDetails": {
+                            "targetId": "real_video_456",
+                            "targetMimeType": "video/mp4"
+                        }
+                    },
+                    {
+                        "id": "shortcut_ignored_doc",
+                        "name": "Notes.pdf",
+                        "mimeType": "application/vnd.google-apps.shortcut",
+                        "shortcutDetails": {
+                            "targetId": "real_doc_789",
+                            "targetMimeType": "application/pdf"
+                        }
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(mockJson)
+        )
+
+        val result = dataSource.listFiles(folderId = "root")
+        assertThat(result.isSuccess).isTrue()
+
+        val list = result.getOrThrow()
+        assertThat(list.files).hasSize(2)
+        assertThat(list.files[0].id).isEqualTo("real_target_folder_123")
+        assertThat(list.files[0].isFolder).isTrue()
+        assertThat(list.files[1].id).isEqualTo("real_video_456")
+        assertThat(list.files[1].isFolder).isFalse()
+    }
 }

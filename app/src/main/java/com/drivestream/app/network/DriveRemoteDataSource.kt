@@ -70,8 +70,8 @@ class DriveRemoteDataSource @Inject constructor(
     ): DriveFileList {
         val escapedFolderId = folderId.replace("'", "\\'")
         val driveQuery = "'$escapedFolderId' in parents and " +
-            "(mimeType contains 'video/' or mimeType = '${DriveFile.FOLDER_MIME_TYPE}') and " +
-            "trashed = false"
+            "(mimeType contains 'video/' or mimeType = '${DriveFile.FOLDER_MIME_TYPE}' or " +
+            "mimeType = '${DriveFile.SHORTCUT_MIME_TYPE}') and trashed = false"
 
         return fetchDriveFiles(query = driveQuery, pageToken = pageToken, pageSize = pageSize)
     }
@@ -83,8 +83,8 @@ class DriveRemoteDataSource @Inject constructor(
     ): DriveFileList {
         val escapedQuery = query.replace("'", "\\'")
         val driveQuery = "name contains '$escapedQuery' and " +
-            "(mimeType contains 'video/' or mimeType = '${DriveFile.FOLDER_MIME_TYPE}') and " +
-            "trashed = false"
+            "(mimeType contains 'video/' or mimeType = '${DriveFile.FOLDER_MIME_TYPE}' or " +
+            "mimeType = '${DriveFile.SHORTCUT_MIME_TYPE}') and trashed = false"
 
         return fetchDriveFiles(query = driveQuery, pageToken = pageToken, pageSize = pageSize)
     }
@@ -120,7 +120,7 @@ class DriveRemoteDataSource @Inject constructor(
 
             val dtoList = json.decodeFromString<GoogleDriveFileListDto>(responseBody)
             return DriveFileList(
-                files = dtoList.files.map { it.toDomain() },
+                files = dtoList.files.mapNotNull { it.toDomain() },
                 nextPageToken = dtoList.nextPageToken
             )
         }
@@ -158,8 +158,20 @@ class DriveRemoteDataSource @Inject constructor(
             body.contains("quotaExceeded")
     }
 
-    private fun GoogleDriveFileDto.toDomain(): DriveFile {
-        val isFolder = mimeType == DriveFile.FOLDER_MIME_TYPE
+    private fun GoogleDriveFileDto.toDomain(): DriveFile? {
+        val isShortcut = mimeType == DriveFile.SHORTCUT_MIME_TYPE
+        val targetMime = shortcutDetails?.targetMimeType
+        val targetId = shortcutDetails?.targetId
+
+        val effectiveMimeType = if (isShortcut) targetMime.orEmpty() else mimeType
+        val effectiveId = if (isShortcut && !targetId.isNullOrBlank()) targetId else id
+        val isFolder = effectiveMimeType == DriveFile.FOLDER_MIME_TYPE
+        val isVideo = effectiveMimeType.contains("video/")
+
+        if (isShortcut && !isFolder && !isVideo) {
+            return null
+        }
+
         val resolution = videoMediaMetadata?.let { meta ->
             if (meta.width != null && meta.height != null) {
                 Resolution(width = meta.width, height = meta.height)
@@ -172,9 +184,9 @@ class DriveRemoteDataSource @Inject constructor(
         val modifiedEpoch = modifiedTime?.let { parseIsoTime(it) } ?: 0L
 
         return DriveFile(
-            id = id,
+            id = effectiveId,
             name = name,
-            mimeType = mimeType,
+            mimeType = effectiveMimeType.ifBlank { mimeType },
             size = sizeBytes,
             thumbnailUrl = thumbnailLink,
             resolution = resolution,
@@ -194,8 +206,8 @@ class DriveRemoteDataSource @Inject constructor(
 
     companion object {
         private const val DRIVE_FILES_ENDPOINT = "https://www.googleapis.com/drive/v3/files"
-        private const val DRIVE_FIELDS =
-            "nextPageToken, files(id, name, mimeType, size, thumbnailLink, videoMediaMetadata, modifiedTime)"
+        private const val DRIVE_FIELDS = "nextPageToken, " +
+            "files(id, name, mimeType, size, thumbnailLink, videoMediaMetadata, modifiedTime, shortcutDetails)"
         const val DEFAULT_PAGE_SIZE = 50
         const val HTTP_UNAUTHORIZED = 401
         const val HTTP_FORBIDDEN = 403

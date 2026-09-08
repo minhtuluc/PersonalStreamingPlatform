@@ -37,6 +37,7 @@ data class DriveFile(
 ) {
     companion object {
         const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
+        const val SHORTCUT_MIME_TYPE = "application/vnd.google-apps.shortcut"
     }
 }
 
@@ -60,7 +61,15 @@ data class GoogleDriveFileDto(
     val size: String? = null,
     val thumbnailLink: String? = null,
     val videoMediaMetadata: GoogleVideoMetadataDto? = null,
-    val modifiedTime: String? = null
+    val modifiedTime: String? = null,
+    val shortcutDetails: GoogleShortcutDetailsDto? = null
+)
+
+@Serializable
+data class GoogleShortcutDetailsDto(
+    val targetId: String? = null,
+    val targetMimeType: String? = null,
+    val targetLookupStatus: String? = null
 )
 
 @Serializable
