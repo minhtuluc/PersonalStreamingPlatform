@@ -58,3 +58,7 @@ Thumbs.db
 # Package-lock and temporary files
 *.tmp
 *.bak
+
+# Internal agent rules and offline documentation
+.agents/
+docs/
