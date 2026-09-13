@@ -78,3 +78,13 @@ data class GoogleVideoMetadataDto(
     val height: Int? = null,
     val durationMillis: String? = null
 )
+
+@Serializable
+enum class FileSortOption {
+    NAME_ASC,
+    NAME_DESC,
+    DATE_DESC,
+    DATE_ASC,
+    SIZE_DESC,
+    SIZE_ASC
+}

@@ -71,7 +71,13 @@ fun NavGraph(
                     )
                 },
                 onVideoClick = { fileId, title ->
-                    navController.navigate(Screen.Player(fileId = fileId, title = Uri.encode(title)))
+                    navController.navigate(
+                        Screen.Player(
+                            fileId = fileId,
+                            title = Uri.encode(title),
+                            folderId = route.folderId
+                        )
+                    )
                 }
             )
         }
@@ -81,6 +87,7 @@ fun NavGraph(
             PlayerScreen(
                 fileId = route.fileId,
                 title = Uri.decode(route.title),
+                folderId = route.folderId,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

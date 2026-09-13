@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.drivestream.app.data.DownloadRepository
 import com.drivestream.app.data.DriveRepository
 import com.drivestream.app.data.model.DriveFile
+import com.drivestream.app.data.model.FileSortOption
+import com.drivestream.app.player.PlayerPlaylistManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -20,11 +22,14 @@ import javax.inject.Inject
 class DriveViewModel @Inject constructor(
     private val driveRepository: DriveRepository,
     savedStateHandle: SavedStateHandle,
-    private val downloadRepository: DownloadRepository? = null
+    private val downloadRepository: DownloadRepository? = null,
+    private val playlistManager: PlayerPlaylistManager? = null
 ) : ViewModel() {
 
     private val folderId: String = savedStateHandle.get<String>("folderId") ?: DEFAULT_FOLDER_ID
     private val folderName: String = savedStateHandle.get<String>("folderName") ?: DEFAULT_FOLDER_NAME
+
+    private var rawFiles: List<DriveFile> = emptyList()
 
     private val _uiState = MutableStateFlow(
         DriveUiState(
@@ -59,9 +64,11 @@ class DriveViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { fileList ->
+                    rawFiles = fileList.files
+                    val sorted = sortFiles(rawFiles, _uiState.value.sortOption)
                     _uiState.update {
                         it.copy(
-                            files = fileList.files,
+                            files = sorted,
                             nextPageToken = fileList.nextPageToken,
                             isLoading = false,
                             isRefreshing = false,
@@ -105,9 +112,11 @@ class DriveViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { fileList ->
+                    rawFiles = rawFiles + fileList.files
+                    val sorted = sortFiles(rawFiles, _uiState.value.sortOption)
                     _uiState.update {
                         it.copy(
-                            files = it.files + fileList.files,
+                            files = sorted,
                             nextPageToken = fileList.nextPageToken,
                             isLoadingMore = false
                         )
@@ -146,9 +155,11 @@ class DriveViewModel @Inject constructor(
         val result = driveRepository.searchVideos(query = query)
         result.fold(
             onSuccess = { fileList ->
+                rawFiles = fileList.files
+                val sorted = sortFiles(rawFiles, _uiState.value.sortOption)
                 _uiState.update {
                     it.copy(
-                        files = fileList.files,
+                        files = sorted,
                         nextPageToken = fileList.nextPageToken,
                         isLoading = false,
                         errorMessage = null
@@ -164,6 +175,42 @@ class DriveViewModel @Inject constructor(
                 }
             }
         )
+    }
+
+    fun setSortOption(option: FileSortOption) {
+        val sorted = sortFiles(rawFiles, option)
+        _uiState.update {
+            it.copy(
+                files = sorted,
+                sortOption = option
+            )
+        }
+    }
+
+    private fun sortFiles(files: List<DriveFile>, option: FileSortOption): List<DriveFile> {
+        val (folders, videos) = files.partition { it.isFolder }
+        val sortedFolders = when (option) {
+            FileSortOption.NAME_ASC -> folders.sortedBy { it.name.lowercase() }
+            FileSortOption.NAME_DESC -> folders.sortedByDescending { it.name.lowercase() }
+            FileSortOption.DATE_DESC -> folders.sortedByDescending { it.modifiedAtEpochMs }
+            FileSortOption.DATE_ASC -> folders.sortedBy { it.modifiedAtEpochMs }
+            FileSortOption.SIZE_DESC -> folders.sortedByDescending { it.name.lowercase() }
+            FileSortOption.SIZE_ASC -> folders.sortedBy { it.name.lowercase() }
+        }
+        val sortedVideos = when (option) {
+            FileSortOption.NAME_ASC -> videos.sortedBy { it.name.lowercase() }
+            FileSortOption.NAME_DESC -> videos.sortedByDescending { it.name.lowercase() }
+            FileSortOption.DATE_DESC -> videos.sortedByDescending { it.modifiedAtEpochMs }
+            FileSortOption.DATE_ASC -> videos.sortedBy { it.modifiedAtEpochMs }
+            FileSortOption.SIZE_DESC -> videos.sortedByDescending { it.size }
+            FileSortOption.SIZE_ASC -> videos.sortedBy { it.size }
+        }
+        return sortedFolders + sortedVideos
+    }
+
+    fun preparePlaylist() {
+        val videoFiles = _uiState.value.files.filter { !it.isFolder }
+        playlistManager?.setPlaylist(videoFiles)
     }
 
     fun refresh() {

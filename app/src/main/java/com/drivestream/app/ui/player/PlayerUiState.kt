@@ -13,7 +13,11 @@ data class PlayerUiState(
     val isControlsVisible: Boolean = true,
     val isLocked: Boolean = false,
     val errorMessage: String? = null,
-    val isInPipMode: Boolean = false
+    val isInPipMode: Boolean = false,
+    val hasPrevious: Boolean = false,
+    val hasNext: Boolean = false,
+    val previousTitle: String? = null,
+    val nextTitle: String? = null
 ) {
     val progress: Float
         get() = if (durationMs > 0L) (currentPositionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f

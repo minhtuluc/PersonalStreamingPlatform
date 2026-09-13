@@ -17,8 +17,11 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.navigation.toRoute
 import com.drivestream.app.data.DownloadRepository
+import com.drivestream.app.data.DriveRepository
 import com.drivestream.app.data.PlayerRepository
+import com.drivestream.app.data.model.DriveFile
 import com.drivestream.app.player.GDriveDataSourceFactory
+import com.drivestream.app.player.PlayerPlaylistManager
 import com.drivestream.app.ui.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -40,15 +43,21 @@ class PlayerViewModel @Inject constructor(
     private val loadControl: LoadControl,
     private val playerRepository: PlayerRepository,
     private val downloadRepository: DownloadRepository,
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    private val playlistManager: PlayerPlaylistManager? = null,
+    private val driveRepository: DriveRepository? = null
 ) : ViewModel() {
 
     private val route = runCatching { savedStateHandle.toRoute<Screen.Player>() }.getOrNull()
     private var _fileId: String = route?.fileId ?: savedStateHandle.get<String>("fileId").orEmpty()
     private var _title: String = Uri.decode(route?.title ?: savedStateHandle.get<String>("title").orEmpty())
+    private var _folderId: String = route?.folderId ?: savedStateHandle.get<String>("folderId").orEmpty()
+
+    private var playlist: List<DriveFile> = emptyList()
 
     val fileId: String get() = _fileId
     val title: String get() = _title
+    val folderId: String get() = _folderId
 
     private val _uiState = MutableStateFlow(
         PlayerUiState(
@@ -65,6 +74,7 @@ class PlayerViewModel @Inject constructor(
 
     init {
         setupPlayer()
+        resolvePlaylist()
         startProgressUpdates()
         startPeriodicSave()
     }
@@ -105,6 +115,10 @@ class PlayerViewModel @Inject constructor(
                     Player.STATE_ENDED -> {
                         _uiState.update { it.copy(isPlaying = false, isBuffering = false) }
                         saveCurrentPosition()
+                        val currentIndex = playlist.indexOfFirst { it.id == _fileId }
+                        if (currentIndex in 0 until (playlist.size - 1)) {
+                            playNext()
+                        }
                     }
                     Player.STATE_IDLE -> Unit
                 }
@@ -133,13 +147,92 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun initialize(incomingFileId: String, incomingTitle: String) {
+    fun initialize(incomingFileId: String, incomingTitle: String, incomingFolderId: String = "") {
         val decodedTitle = Uri.decode(incomingTitle)
+        if (incomingFolderId.isNotBlank() && _folderId.isBlank()) {
+            _folderId = incomingFolderId
+        }
         if (_fileId.isBlank() && incomingFileId.isNotBlank()) {
             _fileId = incomingFileId
             _title = decodedTitle
             _uiState.update { it.copy(fileId = incomingFileId, title = decodedTitle) }
+            resolvePlaylist()
             startPlayback()
+        } else if (playlist.isEmpty()) {
+            resolvePlaylist()
+        }
+    }
+
+    fun playNext() {
+        val currentIndex = playlist.indexOfFirst { it.id == _fileId }
+        if (currentIndex in 0 until (playlist.size - 1)) {
+            val next = playlist[currentIndex + 1]
+            switchVideo(next.id, next.name)
+        }
+    }
+
+    fun playPrevious() {
+        val currentIndex = playlist.indexOfFirst { it.id == _fileId }
+        if (currentIndex > 0) {
+            val prev = playlist[currentIndex - 1]
+            switchVideo(prev.id, prev.name)
+        }
+    }
+
+    private fun switchVideo(newFileId: String, newTitle: String) {
+        saveCurrentPosition()
+        player.stop()
+        player.clearMediaItems()
+
+        _fileId = newFileId
+        _title = newTitle
+
+        _uiState.update {
+            it.copy(
+                fileId = newFileId,
+                title = newTitle,
+                isLoading = true,
+                isBuffering = false,
+                currentPositionMs = 0L,
+                bufferedPositionMs = 0L,
+                durationMs = 0L,
+                errorMessage = null
+            )
+        }
+
+        updateNavigationState()
+        startPlayback()
+    }
+
+    private fun resolvePlaylist() {
+        viewModelScope.launch {
+            val activeList = playlistManager?.getPlaylist().orEmpty()
+            if (activeList.isNotEmpty() && activeList.any { it.id == _fileId }) {
+                playlist = activeList
+            } else if (_folderId.isNotBlank() && driveRepository != null) {
+                val cached = driveRepository.getFolderFiles(_folderId, forceRefresh = false).getOrNull()
+                if (cached != null) {
+                    playlist = cached.files.filter { !it.isFolder }
+                }
+            }
+            updateNavigationState()
+        }
+    }
+
+    private fun updateNavigationState() {
+        val currentIndex = playlist.indexOfFirst { it.id == _fileId }
+        val hasPrev = currentIndex > 0
+        val hasNxt = currentIndex in 0 until (playlist.size - 1)
+        val prevTitle = if (hasPrev) playlist[currentIndex - 1].name else null
+        val nextTitle = if (hasNxt) playlist[currentIndex + 1].name else null
+
+        _uiState.update {
+            it.copy(
+                hasPrevious = hasPrev,
+                hasNext = hasNxt,
+                previousTitle = prevTitle,
+                nextTitle = nextTitle
+            )
         }
     }
 

@@ -42,6 +42,8 @@ import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.ScreenRotation
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
@@ -129,14 +131,15 @@ fun PlayerScreen(
     title: String,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
+    folderId: String = "",
     viewModel: PlayerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val view = LocalView.current
 
-    LaunchedEffect(fileId, title) {
-        viewModel.initialize(fileId, title)
+    LaunchedEffect(fileId, title, folderId) {
+        viewModel.initialize(fileId, title, folderId)
     }
 
     // Immersive Fullscreen Mode
@@ -242,6 +245,8 @@ fun PlayerScreen(
                 onPlayPause = { viewModel.togglePlayPause() },
                 onSeekBackward = { viewModel.seekBackward() },
                 onSeekForward = { viewModel.seekForward() },
+                onPlayPrevious = { viewModel.playPrevious() },
+                onPlayNext = { viewModel.playNext() },
                 onSeekTo = { viewModel.seekTo(it) },
                 onSpeedChange = { viewModel.setPlaybackSpeed(it) },
                 onToggleLock = { viewModel.toggleLock() },
@@ -272,6 +277,8 @@ private fun PlayerControlsOverlay(
     onPlayPause: () -> Unit,
     onSeekBackward: () -> Unit,
     onSeekForward: () -> Unit,
+    onPlayPrevious: () -> Unit,
+    onPlayNext: () -> Unit,
     onSeekTo: (Long) -> Unit,
     onSpeedChange: (Float) -> Unit,
     onToggleLock: () -> Unit,
@@ -314,12 +321,16 @@ private fun PlayerControlsOverlay(
                 modifier = Modifier.align(Alignment.TopCenter)
             )
 
-            // Center Play / Rewind / Forward Controls
+            // Center Play / Rewind / Forward / Skip Controls
             PlayerCenterControls(
                 isPlaying = uiState.isPlaying,
+                hasPrevious = uiState.hasPrevious,
+                hasNext = uiState.hasNext,
                 onPlayPause = onPlayPause,
                 onSeekBackward = onSeekBackward,
                 onSeekForward = onSeekForward,
+                onPlayPrevious = onPlayPrevious,
+                onPlayNext = onPlayNext,
                 modifier = Modifier.align(Alignment.Center)
             )
 
@@ -440,16 +451,36 @@ private fun PlayerTopBar(
 @Composable
 private fun PlayerCenterControls(
     isPlaying: Boolean,
+    hasPrevious: Boolean,
+    hasNext: Boolean,
     onPlayPause: () -> Unit,
     onSeekBackward: () -> Unit,
     onSeekForward: () -> Unit,
+    onPlayPrevious: () -> Unit,
+    onPlayNext: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(36.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        IconButton(
+            onClick = onPlayPrevious,
+            enabled = hasPrevious,
+            modifier = Modifier
+                .size(CONTROLS_BUTTON_SIZE.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = if (hasPrevious) 0.45f else 0.2f))
+        ) {
+            Icon(
+                imageVector = Icons.Default.SkipPrevious,
+                contentDescription = stringResource(R.string.action_previous_video),
+                tint = if (hasPrevious) TextPrimary else TextSecondary.copy(alpha = 0.35f),
+                modifier = Modifier.size(30.dp)
+            )
+        }
+
         IconButton(
             onClick = onSeekBackward,
             modifier = Modifier
@@ -491,6 +522,22 @@ private fun PlayerCenterControls(
                 imageVector = Icons.Default.Forward30,
                 contentDescription = stringResource(R.string.forward_30s),
                 tint = TextPrimary,
+                modifier = Modifier.size(30.dp)
+            )
+        }
+
+        IconButton(
+            onClick = onPlayNext,
+            enabled = hasNext,
+            modifier = Modifier
+                .size(CONTROLS_BUTTON_SIZE.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = if (hasNext) 0.45f else 0.2f))
+        ) {
+            Icon(
+                imageVector = Icons.Default.SkipNext,
+                contentDescription = stringResource(R.string.action_next_video),
+                tint = if (hasNext) TextPrimary else TextSecondary.copy(alpha = 0.35f),
                 modifier = Modifier.size(30.dp)
             )
         }

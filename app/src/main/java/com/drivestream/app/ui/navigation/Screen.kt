@@ -18,7 +18,8 @@ sealed interface Screen {
     @Serializable
     data class Player(
         val fileId: String,
-        val title: String
+        val title: String,
+        val folderId: String = ""
     ) : Screen
 
     @Serializable

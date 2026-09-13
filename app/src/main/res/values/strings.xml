@@ -22,6 +22,13 @@
     <!-- Actions -->
     <string name="action_retry">Thử lại</string>
     <string name="action_refresh">Làm mới</string>
+    <string name="action_sort">Sắp xếp</string>
+    <string name="sort_name_asc">Tên (A → Z)</string>
+    <string name="sort_name_desc">Tên (Z → A)</string>
+    <string name="sort_date_desc">Ngày sửa đổi (Mới nhất)</string>
+    <string name="sort_date_asc">Ngày sửa đổi (Cũ nhất)</string>
+    <string name="sort_size_desc">Dung lượng (Lớn nhất)</string>
+    <string name="sort_size_asc">Dung lượng (Nhỏ nhất)</string>
     <string name="action_delete">Xóa</string>
     <string name="action_download">Tải về</string>
     <string name="action_pause">Tạm dừng</string>
@@ -33,6 +40,8 @@
     <string name="playback_speed">Tốc độ phát</string>
     <string name="rewind_10s">Tua lại 10s</string>
     <string name="forward_30s">Tua tiếp 30s</string>
+    <string name="action_previous_video">Video trước</string>
+    <string name="action_next_video">Video tiếp theo</string>
     <string name="search_drive">Tìm kiếm video...</string>
     <string name="search_no_results">Không tìm thấy video nào phù hợp</string>
     <string name="clear_search">Xóa tìm kiếm</string>

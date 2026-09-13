@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
@@ -27,6 +29,8 @@ import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,6 +62,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivestream.app.R
 import com.drivestream.app.data.model.DriveFile
+import com.drivestream.app.data.model.FileSortOption
 import com.drivestream.app.ui.browser.DriveUiState
 import com.drivestream.app.ui.browser.DriveViewModel
 import com.drivestream.app.ui.components.FolderCard
@@ -111,6 +116,7 @@ fun BrowserScreen(
                 folderName = folderName,
                 isSearchActive = isSearchActive,
                 searchQuery = uiState.searchQuery,
+                currentSortOption = uiState.sortOption,
                 onSearchToggle = { active ->
                     isSearchActive = active
                     if (!active) {
@@ -118,6 +124,7 @@ fun BrowserScreen(
                     }
                 },
                 onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
+                onSortOptionChange = { viewModel.setSortOption(it) },
                 onNavigateBack = onNavigateBack,
                 onRefresh = { viewModel.refresh() }
             )
@@ -149,7 +156,10 @@ fun BrowserScreen(
                     BrowserFileList(
                         uiState = uiState,
                         onFolderClick = onFolderClick,
-                        onVideoClick = onVideoClick,
+                        onVideoClick = { fileId, title ->
+                            viewModel.preparePlaylist()
+                            onVideoClick(fileId, title)
+                        },
                         onDownloadClick = { file -> viewModel.downloadVideo(file) },
                         onLoadMore = { viewModel.loadNextPage() }
                     )
@@ -165,11 +175,15 @@ private fun BrowserTopAppBar(
     folderName: String,
     isSearchActive: Boolean,
     searchQuery: String,
+    currentSortOption: FileSortOption,
     onSearchToggle: (Boolean) -> Unit,
     onSearchQueryChange: (String) -> Unit,
+    onSortOptionChange: (FileSortOption) -> Unit,
     onNavigateBack: () -> Unit,
     onRefresh: () -> Unit
 ) {
+    var isSortMenuOpen by remember { mutableStateOf(false) }
+
     TopAppBar(
         title = {
             if (isSearchActive) {
@@ -238,6 +252,60 @@ private fun BrowserTopAppBar(
                         contentDescription = stringResource(R.string.search_drive),
                         tint = TextPrimary
                     )
+                }
+                Box {
+                    IconButton(onClick = { isSortMenuOpen = true }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Sort,
+                            contentDescription = stringResource(R.string.action_sort),
+                            tint = TextPrimary
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = isSortMenuOpen,
+                        onDismissRequest = { isSortMenuOpen = false },
+                        modifier = Modifier.background(DarkElevated)
+                    ) {
+                        val sortItems = listOf(
+                            FileSortOption.NAME_ASC to stringResource(R.string.sort_name_asc),
+                            FileSortOption.NAME_DESC to stringResource(R.string.sort_name_desc),
+                            FileSortOption.DATE_DESC to stringResource(R.string.sort_date_desc),
+                            FileSortOption.DATE_ASC to stringResource(R.string.sort_date_asc),
+                            FileSortOption.SIZE_DESC to stringResource(R.string.sort_size_desc),
+                            FileSortOption.SIZE_ASC to stringResource(R.string.sort_size_asc)
+                        )
+                        sortItems.forEach { (option, label) ->
+                            val isSelected = option == currentSortOption
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            color = if (isSelected) AccentBlue else TextPrimary,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                },
+                                trailingIcon = {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = AccentBlue,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    onSortOptionChange(option)
+                                    isSortMenuOpen = false
+                                }
+                            )
+                        }
+                    }
                 }
                 IconButton(onClick = onRefresh) {
                     Icon(
