@@ -1,12 +1,16 @@
 package com.drivestream.app.ui.home
 
-import app.cash.turbine.test
 import com.drivestream.app.auth.GoogleAuthManager
 import com.drivestream.app.data.DownloadStatus
 import com.drivestream.app.data.DownloadedVideoDao
 import com.drivestream.app.data.DownloadedVideoEntity
+import com.drivestream.app.data.FavoriteEntity
+import com.drivestream.app.data.FavoritesRepository
+import com.drivestream.app.data.SettingsRepository
 import com.drivestream.app.data.WatchHistoryDao
 import com.drivestream.app.data.WatchHistoryEntity
+import com.drivestream.app.testing.FakeFavoriteDao
+import com.drivestream.app.testing.FakeSharedPreferences
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -14,6 +18,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -32,6 +37,10 @@ class HomeViewModelTest {
     private lateinit var downloadedVideoDao: DownloadedVideoDao
     private lateinit var googleAuthManager: GoogleAuthManager
     private lateinit var viewModel: HomeViewModel
+
+    private val favoriteDao = FakeFavoriteDao()
+    private val settingsRepository = SettingsRepository(FakeSharedPreferences())
+    private val favoritesRepository = FavoritesRepository(favoriteDao, testDispatcher)
 
     private val sampleWatchHistory = WatchHistoryEntity(
         fileId = "w1",
@@ -54,6 +63,18 @@ class HomeViewModelTest {
         status = DownloadStatus.COMPLETED
     )
 
+    private val sampleFavorite = FavoriteEntity(
+        fileId = "fav1",
+        fileName = "Favorite.mp4",
+        isFolder = false,
+        fileSize = 7000L,
+        thumbnailUrl = null,
+        durationMs = 60_000L,
+        resolution = "1080p",
+        modifiedAtEpochMs = 1500L,
+        addedAt = 3000L
+    )
+
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
@@ -69,7 +90,9 @@ class HomeViewModelTest {
         viewModel = HomeViewModel(
             watchHistoryDao = watchHistoryDao,
             downloadedVideoDao = downloadedVideoDao,
-            googleAuthManager = googleAuthManager
+            googleAuthManager = googleAuthManager,
+            settingsRepository = settingsRepository,
+            favoritesRepository = favoritesRepository
         )
     }
 
@@ -81,15 +104,12 @@ class HomeViewModelTest {
     @Test
     @DisplayName("uiState emits combined continue watching, recent history, and downloaded videos")
     fun uiStateEmitsCombinedData() = runTest(testDispatcher) {
-        viewModel.uiState.test {
-            val state = awaitItem()
-            assertThat(state.isLoading).isFalse()
-            assertThat(state.continueWatching).hasSize(1)
-            assertThat(state.continueWatching.first().fileId).isEqualTo("w1")
-            assertThat(state.downloadedVideos).hasSize(1)
-            assertThat(state.downloadedVideos.first().fileId).isEqualTo("d1")
-            cancelAndIgnoreRemainingEvents()
-        }
+        val state = viewModel.uiState.first { !it.isLoading }
+
+        assertThat(state.continueWatching).hasSize(1)
+        assertThat(state.continueWatching.first().fileId).isEqualTo("w1")
+        assertThat(state.downloadedVideos).hasSize(1)
+        assertThat(state.downloadedVideos.first().fileId).isEqualTo("d1")
     }
 
     @Test
@@ -101,5 +121,28 @@ class HomeViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify { googleAuthManager.signOut() }
+    }
+
+    @Test
+    @DisplayName("favorites from the repository are exposed in the home state")
+    fun favoritesAreExposed() = runTest(testDispatcher) {
+        favoriteDao.upsert(sampleFavorite)
+
+        val state = viewModel.uiState.first { it.favorites.isNotEmpty() }
+
+        assertThat(state.favorites).hasSize(1)
+        assertThat(state.favorites.first().fileId).isEqualTo("fav1")
+    }
+
+    @Test
+    @DisplayName("removing a favorite clears it from the home state")
+    fun removedFavoriteDisappears() = runTest(testDispatcher) {
+        favoriteDao.upsert(sampleFavorite)
+        viewModel.uiState.first { it.favorites.isNotEmpty() }
+
+        favoriteDao.delete("fav1")
+
+        val state = viewModel.uiState.first { it.favorites.isEmpty() && !it.isLoading }
+        assertThat(state.favorites).isEmpty()
     }
 }

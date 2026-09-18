@@ -10,6 +10,7 @@ import android.os.Build
 import android.util.Rational
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
@@ -34,7 +35,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Forward30
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
@@ -80,6 +81,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.PictureInPictureModeChangedInfo
+import androidx.core.util.Consumer
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -89,6 +92,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import com.drivestream.app.R
 import com.drivestream.app.ui.components.formatDuration
+import com.drivestream.app.ui.player.AVAILABLE_SPEEDS
+import com.drivestream.app.ui.player.NORMAL_PLAYBACK_SPEED
 import com.drivestream.app.ui.player.PlayerUiState
 import com.drivestream.app.ui.player.PlayerViewModel
 import com.drivestream.app.ui.theme.AccentBlue
@@ -108,21 +113,6 @@ private const val CORNER_RADIUS = 16
 private const val TIME_TEXT_SIZE = 12
 private const val PIP_RATIO_NUMERATOR = 16
 private const val PIP_RATIO_DENOMINATOR = 9
-private const val SPEED_HALF = 0.5f
-private const val SPEED_THREE_QUARTERS = 0.75f
-private const val SPEED_NORMAL = 1.0f
-private const val SPEED_ONE_AND_A_QUARTER = 1.25f
-private const val SPEED_ONE_AND_A_HALF = 1.5f
-private const val SPEED_DOUBLE = 2.0f
-
-private val AVAILABLE_SPEEDS = listOf(
-    SPEED_HALF,
-    SPEED_THREE_QUARTERS,
-    SPEED_NORMAL,
-    SPEED_ONE_AND_A_QUARTER,
-    SPEED_ONE_AND_A_HALF,
-    SPEED_DOUBLE
-)
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -162,6 +152,18 @@ fun PlayerScreen(
                 (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
             viewModel.saveCurrentPosition()
+        }
+    }
+
+    // Hide the HUD while the video is docked in Picture-in-Picture
+    DisposableEffect(view, context) {
+        val activity = context as? ComponentActivity
+        val pipListener = Consumer<PictureInPictureModeChangedInfo> { info ->
+            viewModel.setPipMode(info.isInPictureInPictureMode)
+        }
+        activity?.addOnPictureInPictureModeChangedListener(pipListener)
+        onDispose {
+            activity?.removeOnPictureInPictureModeChangedListener(pipListener)
         }
     }
 
@@ -401,7 +403,7 @@ private fun PlayerTopBar(
                 ) {
                     val normalLabel = stringResource(R.string.speed_normal)
                     AVAILABLE_SPEEDS.forEach { speed ->
-                        val speedText = if (speed == SPEED_NORMAL) "${speed}x ($normalLabel)" else "${speed}x"
+                        val speedText = if (speed == NORMAL_PLAYBACK_SPEED) "${speed}x ($normalLabel)" else "${speed}x"
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -519,8 +521,8 @@ private fun PlayerCenterControls(
                 .background(Color.Black.copy(alpha = 0.45f))
         ) {
             Icon(
-                imageVector = Icons.Default.Forward30,
-                contentDescription = stringResource(R.string.forward_30s),
+                imageVector = Icons.Default.Forward10,
+                contentDescription = stringResource(R.string.forward_10s),
                 tint = TextPrimary,
                 modifier = Modifier.size(30.dp)
             )

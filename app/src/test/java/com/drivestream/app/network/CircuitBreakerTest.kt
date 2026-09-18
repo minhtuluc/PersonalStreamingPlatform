@@ -2,7 +2,6 @@ package com.drivestream.app.network
 
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -41,13 +40,13 @@ class CircuitBreakerTest {
         assertThat(circuitBreaker.state).isEqualTo(CircuitBreaker.State.OPEN)
 
         // Further calls should fail immediately with CircuitBreakerOpenException
-        assertThrows(CircuitBreakerOpenException::class.java) {
-            runTest {
-                circuitBreaker.execute(failureThreshold = threshold) {
-                    "should_not_run"
-                }
+        val error = runCatching {
+            circuitBreaker.execute(failureThreshold = threshold) {
+                "should_not_run"
             }
-        }
+        }.exceptionOrNull()
+
+        assertThat(error).isInstanceOf(CircuitBreakerOpenException::class.java)
     }
 
     @Test

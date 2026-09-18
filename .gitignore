@@ -62,3 +62,4 @@ Thumbs.db
 # Internal agent rules and offline documentation
 .agents/
 docs/
+.commandcode/

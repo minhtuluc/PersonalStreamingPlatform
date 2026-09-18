@@ -168,7 +168,7 @@ class GDriveDataSource(
         // Handle 401 mid-stream token expiration: refresh and retry once
         if (res.code == HttpURLConnection.HTTP_UNAUTHORIZED) {
             res.close()
-            val refreshed = tokenManager.refreshAccessToken()
+            val refreshed = tokenManager.refreshAccessToken(force = true)
             if (refreshed.isSuccess) {
                 token = refreshed.getOrNull() ?: token
                 request = buildRequest(fileId = fileId, token = token, dataSpec = dataSpec)

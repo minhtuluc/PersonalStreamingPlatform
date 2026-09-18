@@ -116,7 +116,7 @@ class DownloadManagerTest {
             rateLimiter = rateLimiter,
             ioDispatcher = testDispatcher
         )
-        downloadManager.endpointTemplate = mockWebServer.url("/files/{fileId}?alt=media").toString()
+        downloadManager.endpointTemplate = "${mockWebServer.url("/")}files/{fileId}?alt=media"
     }
 
     @AfterEach
@@ -167,7 +167,7 @@ class DownloadManagerTest {
                 .setBody(payload)
         )
 
-        coEvery { tokenManager.refreshAccessToken() } returns Result.success("new_token_789")
+        coEvery { tokenManager.refreshAccessToken(any()) } returns Result.success("new_token_789")
 
         downloadManager.enqueue("file_2", "Video2.mp4", payload.length.toLong())
         advanceUntilIdle()

@@ -40,7 +40,8 @@ data class DownloadProgress(
     val downloadedBytes: Long,
     val totalBytes: Long,
     val status: DownloadStatus,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val failure: DownloadFailure? = null
 ) {
     val progressFraction: Float
         get() = if (totalBytes > 0L) (downloadedBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
@@ -230,7 +231,7 @@ class DownloadManager @Inject constructor(
     private suspend fun handleAuthRetry(response: Response, fileId: String, downloaded: Long): Response {
         if (response.code != HTTP_UNAUTHORIZED) return response
         response.close()
-        val refreshed = tokenManager.refreshAccessToken().getOrNull() ?: ""
+        val refreshed = tokenManager.refreshAccessToken(force = true).getOrNull() ?: ""
         return fetchDownloadStream(fileId, downloaded, refreshed)
     }
 
@@ -310,7 +311,13 @@ class DownloadManager @Inject constructor(
         Timber.e(e, "Download failed for fileId: %s", fileId)
         val bytes = if (partFile.exists()) partFile.length() else 0L
         downloadedVideoDao.updateProgress(fileId, bytes, DownloadStatus.FAILED)
-        updateProgressMap(fileId, bytes, totalSize, DownloadStatus.FAILED, e.message)
+        updateProgressMap(fileId, bytes, totalSize, DownloadStatus.FAILED, e.message, e.toDownloadFailure())
+    }
+
+    private fun Exception.toDownloadFailure(): DownloadFailure = when (this) {
+        is InsufficientStorageException -> DownloadFailure.INSUFFICIENT_STORAGE
+        is IOException -> DownloadFailure.NETWORK
+        else -> DownloadFailure.OTHER
     }
 
     private fun finishActiveTask(fileId: String) {
@@ -330,10 +337,11 @@ class DownloadManager @Inject constructor(
         downloadedBytes: Long,
         totalBytes: Long,
         status: DownloadStatus,
-        errorMessage: String? = null
+        errorMessage: String? = null,
+        failure: DownloadFailure? = null
     ) {
         _progressFlow.update { current ->
-            current + (fileId to DownloadProgress(fileId, downloadedBytes, totalBytes, status, errorMessage))
+            current + (fileId to DownloadProgress(fileId, downloadedBytes, totalBytes, status, errorMessage, failure))
         }
     }
 }

@@ -45,10 +45,10 @@ class TokenManager(
         }
     }
 
-    suspend fun refreshAccessToken(): Result<String> = refreshMutex.withLock {
+    suspend fun refreshAccessToken(force: Boolean = false): Result<String> = refreshMutex.withLock {
         // Double-check after acquiring lock to deduplicate concurrent requests
         val freshTokens = tokenStorage.getTokens()
-        if (freshTokens != null) {
+        if (!force && freshTokens != null) {
             val remainingSeconds = freshTokens.expiresAtEpochSeconds - clock.currentTimeSeconds()
             if (remainingSeconds > REFRESH_THRESHOLD_SECONDS) {
                 Timber.d("Token was already refreshed by another concurrent job. Reusing.")

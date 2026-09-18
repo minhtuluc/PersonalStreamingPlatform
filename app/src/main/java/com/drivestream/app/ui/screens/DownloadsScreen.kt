@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircleOutline
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,10 +39,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +61,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drivestream.app.R
 import com.drivestream.app.data.DownloadStatus
+import com.drivestream.app.download.DownloadFailure
 import com.drivestream.app.ui.download.DownloadUiItem
 import com.drivestream.app.ui.download.DownloadViewModel
 import com.drivestream.app.ui.theme.AccentBlue
@@ -82,6 +88,31 @@ fun DownloadsScreen(
     viewModel: DownloadViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var pendingDeleteFileId by remember { mutableStateOf<String?>(null) }
+
+    pendingDeleteFileId?.let { fileId ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteFileId = null },
+            containerColor = DarkElevated,
+            titleContentColor = TextPrimary,
+            textContentColor = TextSecondary,
+            title = { Text(text = stringResource(R.string.delete_download_title)) },
+            text = { Text(text = stringResource(R.string.confirm_delete_download)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDeleteFileId = null
+                    viewModel.deleteDownload(fileId)
+                }) {
+                    Text(text = stringResource(R.string.action_delete), color = AccentRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteFileId = null }) {
+                    Text(text = stringResource(R.string.action_cancel), color = TextSecondary)
+                }
+            }
+        )
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -132,7 +163,7 @@ fun DownloadsScreen(
                             onPlay = { onPlayVideo(item.fileId, item.fileName) },
                             onPause = { viewModel.pauseDownload(item.fileId) },
                             onResume = { viewModel.resumeDownload(item.fileId) },
-                            onDelete = { viewModel.deleteDownload(item.fileId) }
+                            onDelete = { pendingDeleteFileId = item.fileId }
                         )
                     }
                 }
@@ -299,8 +330,33 @@ private fun DownloadItemCard(
                     )
                 }
             }
+
+            if (item.status == DownloadStatus.FAILED) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.WarningAmber,
+                        contentDescription = null,
+                        tint = AccentRed,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = downloadFailureMessage(item.failure),
+                        fontSize = 11.sp,
+                        color = AccentRed
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun downloadFailureMessage(failure: DownloadFailure?): String = when (failure) {
+    DownloadFailure.INSUFFICIENT_STORAGE -> stringResource(R.string.error_insufficient_storage)
+    DownloadFailure.NETWORK -> stringResource(R.string.error_download_network)
+    DownloadFailure.OTHER, null -> stringResource(R.string.download_failed)
 }
 
 @Composable

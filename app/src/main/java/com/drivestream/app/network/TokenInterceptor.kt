@@ -41,7 +41,7 @@ class TokenInterceptor(
             Timber.w("Received 401 Unauthorized from Drive API. Attempting token refresh and retry...")
             response.close()
 
-            val refreshResult = runBlocking { tokenManager.refreshAccessToken() }
+            val refreshResult = runBlocking { tokenManager.refreshAccessToken(force = true) }
             val newAccessToken = refreshResult.getOrNull()
 
             if (!newAccessToken.isNullOrBlank()) {

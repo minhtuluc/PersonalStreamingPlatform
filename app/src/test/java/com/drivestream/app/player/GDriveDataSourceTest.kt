@@ -8,15 +8,40 @@ import com.drivestream.app.auth.TokenManager
 import com.drivestream.app.network.RateLimiter
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+
+private const val GDRIVE_SCHEME = "gdrive"
+private const val VIDEO_FILE_ID = "video_abc"
+private const val DRIVE_PATH_PREFIX = "/drive/v3/files/"
+private const val RETRYABLE_ATTEMPTS = 4
+
+/**
+ * android.net.Uri is not available in plain JVM unit tests, so the media Uri is
+ * stubbed with the exact accessors [GDriveDataSource.extractFileId] reads.
+ */
+private fun gdriveUri(fileId: String): Uri {
+    val uri: Uri = mockk(relaxed = true)
+    every { uri.scheme } returns GDRIVE_SCHEME
+    every { uri.host } returns fileId
+    every { uri.toString() } returns "$GDRIVE_SCHEME://$fileId"
+    return uri
+}
+
+private fun driveApiUri(fileId: String): Uri {
+    val uri: Uri = mockk(relaxed = true)
+    every { uri.scheme } returns "https"
+    every { uri.path } returns "$DRIVE_PATH_PREFIX$fileId"
+    every { uri.toString() } returns "https://www.googleapis.com$DRIVE_PATH_PREFIX$fileId?alt=media"
+    return uri
+}
 
 class GDriveDataSourceTest {
 
@@ -41,7 +66,7 @@ class GDriveDataSourceTest {
             okHttpClient = okHttpClient,
             tokenManager = tokenManager,
             rateLimiter = rateLimiter,
-            endpointTemplate = mockWebServer.url("/files/{fileId}?alt=media").toString()
+            endpointTemplate = "${mockWebServer.url("/")}files/{fileId}?alt=media"
         )
     }
 
@@ -54,17 +79,17 @@ class GDriveDataSourceTest {
     @Test
     @DisplayName("open sends request with Bearer token and alt=media")
     fun openSuccess() {
+        val payload = "video-data-bytes"
         mockWebServer.enqueue(
             MockResponse()
                 .setResponseCode(200)
-                .setHeader("Content-Length", "1024")
-                .setBody("video-data-bytes")
+                .setBody(payload)
         )
 
-        val dataSpec = DataSpec(Uri.parse("gdrive://video_abc"))
+        val dataSpec = DataSpec(gdriveUri(VIDEO_FILE_ID))
         val bytesToRead = dataSource.open(dataSpec)
 
-        assertThat(bytesToRead).isEqualTo(1024L)
+        assertThat(bytesToRead).isEqualTo(payload.length.toLong())
 
         val recordedRequest = mockWebServer.takeRequest()
         assertThat(recordedRequest.path).contains("/files/video_abc?alt=media")
@@ -83,7 +108,7 @@ class GDriveDataSourceTest {
         )
 
         val dataSpec = DataSpec(
-            Uri.parse("gdrive://video_abc"),
+            gdriveUri(VIDEO_FILE_ID),
             2048L, // position
             2048L  // length
         )
@@ -106,7 +131,7 @@ class GDriveDataSourceTest {
                 .setBody(testPayload)
         )
 
-        val dataSpec = DataSpec(Uri.parse("gdrive://video_abc"))
+        val dataSpec = DataSpec(gdriveUri(VIDEO_FILE_ID))
         dataSource.open(dataSpec)
 
         val buffer = ByteArray(10)
@@ -123,6 +148,8 @@ class GDriveDataSourceTest {
     @Test
     @DisplayName("open retries and refreshes token when encountering 401 mid-stream")
     fun midStreamTokenRefresh() {
+        val payload = "refreshed-data"
+
         // First call: 401 Unauthorized
         mockWebServer.enqueue(
             MockResponse()
@@ -133,16 +160,15 @@ class GDriveDataSourceTest {
         mockWebServer.enqueue(
             MockResponse()
                 .setResponseCode(200)
-                .setHeader("Content-Length", "500")
-                .setBody("refreshed-data")
+                .setBody(payload)
         )
 
-        coEvery { tokenManager.refreshAccessToken() } returns Result.success("new_token_456")
+        coEvery { tokenManager.refreshAccessToken(any()) } returns Result.success("new_token_456")
 
-        val dataSpec = DataSpec(Uri.parse("gdrive://video_abc"))
+        val dataSpec = DataSpec(gdriveUri(VIDEO_FILE_ID))
         val bytes = dataSource.open(dataSpec)
 
-        assertThat(bytes).isEqualTo(500L)
+        assertThat(bytes).isEqualTo(payload.length.toLong())
         assertThat(mockWebServer.requestCount).isEqualTo(2)
 
         val firstReq = mockWebServer.takeRequest()
@@ -162,7 +188,7 @@ class GDriveDataSourceTest {
                 .setBody("Requested Range Not Satisfiable")
         )
 
-        val dataSpec = DataSpec(Uri.parse("gdrive://video_abc"), 5000L, 1000L)
+        val dataSpec = DataSpec(gdriveUri(VIDEO_FILE_ID), 5000L, 1000L)
         val bytes = dataSource.open(dataSpec)
 
         assertThat(bytes).isEqualTo(0L)
@@ -171,26 +197,25 @@ class GDriveDataSourceTest {
     @Test
     @DisplayName("open throws InvalidResponseCodeException for unhandled HTTP error")
     fun openThrowsOnServerError() {
-        mockWebServer.enqueue(
-            MockResponse()
-                .setResponseCode(500)
-                .setBody("Internal Server Error")
-        )
-
-        val dataSpec = DataSpec(Uri.parse("gdrive://video_abc"))
-        assertThrows(HttpDataSource.InvalidResponseCodeException::class.java) {
-            dataSource.open(dataSpec)
+        // Server errors are retryable, so queue one response per attempt (initial + retries)
+        repeat(RETRYABLE_ATTEMPTS) {
+            mockWebServer.enqueue(
+                MockResponse()
+                    .setResponseCode(500)
+                    .setBody("Internal Server Error")
+            )
         }
+
+        val dataSpec = DataSpec(gdriveUri(VIDEO_FILE_ID))
+        val error = runCatching { dataSource.open(dataSpec) }.exceptionOrNull()
+
+        assertThat(error).isInstanceOf(HttpDataSource.InvalidResponseCodeException::class.java)
     }
 
     @Test
     @DisplayName("extractFileId parses gdrive and standard URLs correctly")
     fun extractFileIdTests() {
-        assertThat(GDriveDataSource.extractFileId(Uri.parse("gdrive://video_123"))).isEqualTo("video_123")
-        assertThat(
-            GDriveDataSource.extractFileId(
-                Uri.parse("https://www.googleapis.com/drive/v3/files/file_xyz?alt=media")
-            )
-        ).isEqualTo("file_xyz")
+        assertThat(GDriveDataSource.extractFileId(gdriveUri("video_123"))).isEqualTo("video_123")
+        assertThat(GDriveDataSource.extractFileId(driveApiUri("file_xyz"))).isEqualTo("file_xyz")
     }
 }

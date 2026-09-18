@@ -39,7 +39,7 @@
     <string name="buffering">Đang tải...</string>
     <string name="playback_speed">Tốc độ phát</string>
     <string name="rewind_10s">Tua lại 10s</string>
-    <string name="forward_30s">Tua tiếp 30s</string>
+    <string name="forward_10s">Tua tiếp 10s</string>
     <string name="action_previous_video">Video trước</string>
     <string name="action_next_video">Video tiếp theo</string>
     <string name="search_drive">Tìm kiếm video...</string>
@@ -63,8 +63,40 @@
     <string name="storage_available">Trống: %1$s</string>
     <string name="storage_title">Dung lượng bộ nhớ</string>
     <string name="error_insufficient_storage">Bộ nhớ máy không đủ dung lượng để tải video này</string>
+    <string name="error_download_network">Lỗi kết nối khi tải. Kiểm tra mạng rồi thử lại.</string>
+    <string name="delete_download_title">Xoá video</string>
     <string name="confirm_delete_download">Bạn có chắc muốn xóa video này khỏi máy?</string>
     <string name="download_notification_channel_name">Tiến trình tải video</string>
     <string name="download_notification_channel_desc">Hiển thị thanh tiến trình khi tải video từ Google Drive</string>
     <string name="download_in_progress">Đang tải: %1$s</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Cài đặt</string>
+    <string name="settings_open">Mở cài đặt</string>
+    <string name="settings_section_library">Thư viện</string>
+    <string name="settings_section_playback">Phát video</string>
+    <string name="settings_section_browsing">Duyệt Drive</string>
+    <string name="settings_section_data">Dữ liệu</string>
+    <string name="settings_section_account">Tài khoản</string>
+    <string name="settings_default_sort">Sắp xếp mặc định</string>
+    <string name="settings_view_mode">Chế độ xem</string>
+    <string name="view_mode_list">Danh sách</string>
+    <string name="view_mode_grid">Lưới</string>
+    <string name="settings_autoplay_next">Tự động phát video kế tiếp</string>
+    <string name="settings_default_speed">Tốc độ phát mặc định</string>
+    <string name="settings_resume_last_folder">Mở lại thư mục lần cuối</string>
+    <string name="settings_clear_cache">Xoá cache Drive</string>
+    <string name="settings_clear_history">Xoá lịch sử xem</string>
+    <string name="settings_cache_cleared">Đã xoá cache Drive</string>
+    <string name="settings_history_cleared">Đã xoá lịch sử xem</string>
+    <string name="settings_app_version">Phiên bản ứng dụng</string>
+    <string name="confirm_clear_history">Bạn có chắc muốn xoá toàn bộ lịch sử xem?</string>
+
+    <!-- Favorites -->
+    <string name="favorites_title">Yêu thích</string>
+    <string name="action_favorite">Yêu thích</string>
+    <string name="favorites_remove">Bỏ khỏi yêu thích</string>
+    <string name="favorites_see_all">Xem tất cả</string>
+    <string name="favorites_empty">Chưa có mục nào trong danh sách yêu thích</string>
+    <string name="favorites_folder_label">Thư mục</string>
 </resources>

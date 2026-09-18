@@ -19,6 +19,7 @@ import androidx.navigation.toRoute
 import com.drivestream.app.data.DownloadRepository
 import com.drivestream.app.data.DriveRepository
 import com.drivestream.app.data.PlayerRepository
+import com.drivestream.app.data.SettingsRepository
 import com.drivestream.app.data.model.DriveFile
 import com.drivestream.app.player.GDriveDataSourceFactory
 import com.drivestream.app.player.PlayerPlaylistManager
@@ -35,7 +36,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LongParameterList")
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -44,6 +45,7 @@ class PlayerViewModel @Inject constructor(
     private val playerRepository: PlayerRepository,
     private val downloadRepository: DownloadRepository,
     savedStateHandle: SavedStateHandle,
+    private val settingsRepository: SettingsRepository,
     private val playlistManager: PlayerPlaylistManager? = null,
     private val driveRepository: DriveRepository? = null
 ) : ViewModel() {
@@ -73,10 +75,17 @@ class PlayerViewModel @Inject constructor(
     private var periodicSaveJob: Job? = null
 
     init {
+        applyDefaultPlaybackSpeed()
         setupPlayer()
         resolvePlaylist()
         startProgressUpdates()
         startPeriodicSave()
+    }
+
+    private fun applyDefaultPlaybackSpeed() {
+        val speed = settingsRepository.settings.value.defaultPlaybackSpeed
+        player.playbackParameters = PlaybackParameters(speed)
+        _uiState.update { it.copy(playbackSpeed = speed) }
     }
 
     private fun createExoPlayer(): ExoPlayer {
@@ -115,9 +124,11 @@ class PlayerViewModel @Inject constructor(
                     Player.STATE_ENDED -> {
                         _uiState.update { it.copy(isPlaying = false, isBuffering = false) }
                         saveCurrentPosition()
-                        val currentIndex = playlist.indexOfFirst { it.id == _fileId }
-                        if (currentIndex in 0 until (playlist.size - 1)) {
-                            playNext()
+                        if (settingsRepository.settings.value.autoplayNext) {
+                            val currentIndex = playlist.indexOfFirst { it.id == _fileId }
+                            if (currentIndex in 0 until (playlist.size - 1)) {
+                                playNext()
+                            }
                         }
                     }
                     Player.STATE_IDLE -> Unit
@@ -375,7 +386,7 @@ class PlayerViewModel @Inject constructor(
     companion object {
         const val PROGRESS_UPDATE_INTERVAL_MS = 500L
         const val PERIODIC_SAVE_INTERVAL_MS = 10_000L
-        const val SEEK_FORWARD_OFFSET_MS = 30_000L
+        const val SEEK_FORWARD_OFFSET_MS = 10_000L
         const val SEEK_BACKWARD_OFFSET_MS = -10_000L
     }
 }

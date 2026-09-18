@@ -4,8 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.drivestream.app.AppError
 import com.drivestream.app.data.DriveRepository
+import com.drivestream.app.data.FavoritesRepository
+import com.drivestream.app.data.SettingsRepository
 import com.drivestream.app.data.model.DriveFile
 import com.drivestream.app.data.model.DriveFileList
+import com.drivestream.app.testing.FakeFavoriteDao
+import com.drivestream.app.testing.FakeSharedPreferences
 import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -28,6 +32,8 @@ class DriveViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private val driveRepository: DriveRepository = mockk()
+    private val settingsRepository = SettingsRepository(FakeSharedPreferences())
+    private val favoritesRepository = FavoritesRepository(FakeFavoriteDao(), testDispatcher)
 
     private val sampleFiles = listOf(
         DriveFile(id = "f1", name = "Movies", mimeType = DriveFile.FOLDER_MIME_TYPE, isFolder = true),
@@ -52,7 +58,12 @@ class DriveViewModelTest {
         } returns Result.success(DriveFileList(files = sampleFiles, nextPageToken = "next1"))
 
         val savedStateHandle = SavedStateHandle(mapOf("folderId" to "root", "folderName" to "My Drive"))
-        val viewModel = DriveViewModel(driveRepository, savedStateHandle)
+        val viewModel = DriveViewModel(
+            driveRepository,
+            savedStateHandle,
+            settingsRepository,
+            favoritesRepository
+        )
 
         advanceUntilIdle()
 
@@ -73,7 +84,12 @@ class DriveViewModelTest {
         } returns Result.failure(AppError.NetworkUnavailable(java.io.IOException("Network error occurred")))
 
         val savedStateHandle = SavedStateHandle(mapOf("folderId" to "root", "folderName" to "My Drive"))
-        val viewModel = DriveViewModel(driveRepository, savedStateHandle)
+        val viewModel = DriveViewModel(
+            driveRepository,
+            savedStateHandle,
+            settingsRepository,
+            favoritesRepository
+        )
 
         advanceUntilIdle()
 
@@ -93,7 +109,12 @@ class DriveViewModelTest {
         } returns Result.success(DriveFileList(files = sampleFiles, nextPageToken = "next1"))
 
         val savedStateHandle = SavedStateHandle(mapOf("folderId" to "root"))
-        val viewModel = DriveViewModel(driveRepository, savedStateHandle)
+        val viewModel = DriveViewModel(
+            driveRepository,
+            savedStateHandle,
+            settingsRepository,
+            favoritesRepository
+        )
         advanceUntilIdle()
 
         val moreFiles = listOf(
@@ -129,7 +150,12 @@ class DriveViewModelTest {
         } returns Result.success(DriveFileList(files = searchResult))
 
         val savedStateHandle = SavedStateHandle(mapOf("folderId" to "root"))
-        val viewModel = DriveViewModel(driveRepository, savedStateHandle)
+        val viewModel = DriveViewModel(
+            driveRepository,
+            savedStateHandle,
+            settingsRepository,
+            favoritesRepository
+        )
         advanceUntilIdle()
 
         viewModel.onSearchQueryChange("Matrix")
@@ -156,7 +182,12 @@ class DriveViewModelTest {
         } returns Result.success(DriveFileList(files = emptyList()))
 
         val savedStateHandle = SavedStateHandle(mapOf("folderId" to "root"))
-        val viewModel = DriveViewModel(driveRepository, savedStateHandle)
+        val viewModel = DriveViewModel(
+            driveRepository,
+            savedStateHandle,
+            settingsRepository,
+            favoritesRepository
+        )
         advanceUntilIdle()
 
         viewModel.onSearchQueryChange("Avatar")
@@ -188,7 +219,12 @@ class DriveViewModelTest {
         } returns Result.success(DriveFileList(files = testFiles))
 
         val savedStateHandle = SavedStateHandle(mapOf("folderId" to "root"))
-        val viewModel = DriveViewModel(driveRepository, savedStateHandle)
+        val viewModel = DriveViewModel(
+            driveRepository,
+            savedStateHandle,
+            settingsRepository,
+            favoritesRepository
+        )
         advanceUntilIdle()
 
         // Default NAME_ASC: Folders A_Folder, B_Folder, then Videos Avatar, Zootopia
@@ -223,7 +259,12 @@ class DriveViewModelTest {
         } returns Result.success(DriveFileList(files = testFiles))
 
         val savedStateHandle = SavedStateHandle(mapOf("folderId" to "root"))
-        val viewModel = DriveViewModel(driveRepository, savedStateHandle)
+        val viewModel = DriveViewModel(
+            driveRepository,
+            savedStateHandle,
+            settingsRepository,
+            favoritesRepository
+        )
         advanceUntilIdle()
 
         viewModel.setSortOption(com.drivestream.app.data.model.FileSortOption.SIZE_DESC)
@@ -260,6 +301,8 @@ class DriveViewModelTest {
         val viewModel = DriveViewModel(
             driveRepository = driveRepository,
             savedStateHandle = savedStateHandle,
+            settingsRepository = settingsRepository,
+            favoritesRepository = favoritesRepository,
             playlistManager = playlistManager
         )
         advanceUntilIdle()

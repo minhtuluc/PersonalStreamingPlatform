@@ -12,7 +12,8 @@ sealed interface Screen {
     @Serializable
     data class Browser(
         val folderId: String = "root",
-        val folderName: String = "My Drive"
+        val folderName: String = "My Drive",
+        val path: String = ""
     ) : Screen
 
     @Serializable
@@ -24,4 +25,10 @@ sealed interface Screen {
 
     @Serializable
     data object Downloads : Screen
+
+    @Serializable
+    data object Settings : Screen
+
+    @Serializable
+    data object Favorites : Screen
 }

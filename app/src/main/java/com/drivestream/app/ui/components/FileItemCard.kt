@@ -20,6 +20,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -44,6 +46,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.drivestream.app.R
 import com.drivestream.app.data.model.DriveFile
+import com.drivestream.app.ui.theme.AccentAmber
 import com.drivestream.app.ui.theme.AccentBlue
 import com.drivestream.app.ui.theme.AccentTeal
 import com.drivestream.app.ui.theme.DarkElevated
@@ -71,7 +74,9 @@ private const val MILLIS_PER_SECOND = 1000L
 fun FolderCard(
     folder: DriveFile,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null
 ) {
     Card(
         modifier = modifier
@@ -116,6 +121,13 @@ fun FolderCard(
                 modifier = Modifier.weight(1f)
             )
 
+            if (onToggleFavorite != null) {
+                FavoriteToggleButton(
+                    isFavorite = isFavorite,
+                    onToggleFavorite = onToggleFavorite
+                )
+            }
+
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
@@ -131,7 +143,9 @@ fun VideoCard(
     video: DriveFile,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onDownloadClick: (() -> Unit)? = null
+    onDownloadClick: (() -> Unit)? = null,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null
 ) {
     Card(
         modifier = modifier
@@ -199,6 +213,13 @@ fun VideoCard(
                 }
             }
 
+            if (onToggleFavorite != null) {
+                FavoriteToggleButton(
+                    isFavorite = isFavorite,
+                    onToggleFavorite = onToggleFavorite
+                )
+            }
+
             if (onDownloadClick != null) {
                 IconButton(onClick = onDownloadClick) {
                     Icon(
@@ -213,7 +234,21 @@ fun VideoCard(
 }
 
 @Composable
-private fun VideoThumbnail(
+private fun FavoriteToggleButton(
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit
+) {
+    IconButton(onClick = onToggleFavorite) {
+        Icon(
+            imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+            contentDescription = stringResource(R.string.action_favorite),
+            tint = if (isFavorite) AccentAmber else TextSecondary
+        )
+    }
+}
+
+@Composable
+fun VideoThumbnail(
     video: DriveFile,
     modifier: Modifier = Modifier
 ) {
@@ -275,7 +310,7 @@ private fun VideoThumbnail(
 }
 
 @Composable
-private fun ResolutionBadge(
+fun ResolutionBadge(
     label: String,
     modifier: Modifier = Modifier
 ) {

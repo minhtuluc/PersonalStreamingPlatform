@@ -78,6 +78,10 @@ detekt {
     autoCorrect = false
 }
 
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+}
+
 dependencies {
     // AndroidX & Lifecycle
     implementation(libs.androidx.core.ktx)

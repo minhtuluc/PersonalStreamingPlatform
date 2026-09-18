@@ -2,7 +2,6 @@ package com.drivestream.app.network
 
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -61,16 +60,16 @@ class RateLimiterTest {
     @DisplayName("executeWithRetry fails when retries are exhausted")
     fun executeWithRetryExhausts() = runTest {
         var callCount = 0
-        assertThrows(RateLimitException::class.java) {
-            runTest {
-                rateLimiter.executeWithRetry(
-                    policy = RetryPolicy(maxRetries = 2, initialDelayMs = 10L)
-                ) {
-                    callCount++
-                    throw RateLimitException("Always failing")
-                }
+        val error = runCatching {
+            rateLimiter.executeWithRetry(
+                policy = RetryPolicy(maxRetries = 2, initialDelayMs = 10L)
+            ) {
+                callCount++
+                throw RateLimitException("Always failing")
             }
-        }
+        }.exceptionOrNull()
+
+        assertThat(error).isInstanceOf(RateLimitException::class.java)
         assertThat(callCount).isEqualTo(3) // 1 initial + 2 retries
     }
 
@@ -78,16 +77,16 @@ class RateLimiterTest {
     @DisplayName("executeWithRetry does not retry non-retryable exceptions")
     fun executeWithRetryNonRetryable() = runTest {
         var callCount = 0
-        assertThrows(IllegalArgumentException::class.java) {
-            runTest {
-                rateLimiter.executeWithRetry(
-                    policy = RetryPolicy(maxRetries = 3, initialDelayMs = 10L)
-                ) {
-                    callCount++
-                    throw IllegalArgumentException("Non-retryable")
-                }
+        val error = runCatching {
+            rateLimiter.executeWithRetry(
+                policy = RetryPolicy(maxRetries = 3, initialDelayMs = 10L)
+            ) {
+                callCount++
+                throw IllegalArgumentException("Non-retryable")
             }
-        }
+        }.exceptionOrNull()
+
+        assertThat(error).isInstanceOf(IllegalArgumentException::class.java)
         assertThat(callCount).isEqualTo(1)
     }
 

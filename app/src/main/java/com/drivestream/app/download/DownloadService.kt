@@ -49,6 +49,10 @@ class DownloadService : Service() {
         private const val MAX_PROGRESS = 100
         private const val BYTES_PER_MB = 1048576.0
         private const val MB_PER_GB = 1024.0
+        private const val REQUEST_CODE_OPEN_APP = 0
+        private const val REQUEST_CODE_PAUSE = 1
+        private const val REQUEST_CODE_CANCEL = 2
+        private const val REQUEST_CODE_RESUME = 3
     }
 
     override fun onCreate() {
@@ -101,20 +105,22 @@ class DownloadService : Service() {
         progressJob?.cancel()
         progressJob = serviceScope.launch {
             downloadManager.progressFlow.collectLatest { progressMap ->
-                val active = progressMap.values.firstOrNull {
-                    it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED
-                }
+                val active = progressMap.values.firstOrNull { it.isRunning() }
+                    ?: progressMap.values.firstOrNull { it.status == DownloadStatus.PAUSED }
 
                 if (active != null) {
-                    val notification = buildProgressNotification(active)
                     val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    manager.notify(NOTIFICATION_ID, notification)
+                    manager.notify(NOTIFICATION_ID, buildProgressNotification(active))
                 } else {
                     stopForeground(STOP_FOREGROUND_REMOVE)
                     stopSelf()
                 }
             }
         }
+    }
+
+    private fun DownloadProgress.isRunning(): Boolean {
+        return status == DownloadStatus.DOWNLOADING || status == DownloadStatus.QUEUED
     }
 
     private fun createInitialNotification(): Notification {
@@ -133,46 +139,53 @@ class DownloadService : Service() {
         val downloadedText = formatFileSize(progress.downloadedBytes)
         val totalText = formatFileSize(progress.totalBytes)
         val contentText = "$downloadedText / $totalText ($percent%)"
+        val isPaused = progress.status == DownloadStatus.PAUSED
 
         val openAppIntent = PendingIntent.getActivity(
             this,
-            0,
+            REQUEST_CODE_OPEN_APP,
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val pauseIntent = PendingIntent.getService(
-            this,
-            1,
-            Intent(this, DownloadService::class.java).apply {
-                action = ACTION_PAUSE
-                putExtra(EXTRA_FILE_ID, progress.fileId)
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val cancelIntent = PendingIntent.getService(
-            this,
-            2,
-            Intent(this, DownloadService::class.java).apply {
-                action = ACTION_CANCEL
-                putExtra(EXTRA_FILE_ID, progress.fileId)
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.download_in_progress, progress.fileId))
             .setContentText(contentText)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setProgress(MAX_PROGRESS, percent, false)
             .setContentIntent(openAppIntent)
-            .setOngoing(true)
+            .setOngoing(!isPaused)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .addAction(android.R.drawable.ic_media_pause, getString(R.string.action_pause), pauseIntent)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.action_cancel), cancelIntent)
-            .build()
+
+        builder.addAction(
+            if (isPaused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause,
+            getString(if (isPaused) R.string.action_resume else R.string.action_pause),
+            createActionIntent(
+                requestCode = if (isPaused) REQUEST_CODE_RESUME else REQUEST_CODE_PAUSE,
+                action = if (isPaused) ACTION_RESUME else ACTION_PAUSE,
+                fileId = progress.fileId
+            )
+        )
+        builder.addAction(
+            android.R.drawable.ic_menu_close_clear_cancel,
+            getString(R.string.action_cancel),
+            createActionIntent(REQUEST_CODE_CANCEL, ACTION_CANCEL, progress.fileId)
+        )
+
+        return builder.build()
+    }
+
+    private fun createActionIntent(requestCode: Int, action: String, fileId: String): PendingIntent {
+        return PendingIntent.getService(
+            this,
+            requestCode,
+            Intent(this, DownloadService::class.java).apply {
+                this.action = action
+                putExtra(EXTRA_FILE_ID, fileId)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     private fun createNotificationChannel() {

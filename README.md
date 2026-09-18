@@ -31,35 +31,40 @@ Google Drive's built-in web interface and official mobile apps heavily compress 
   * Minimum buffer: **30 seconds** | Maximum buffer: **90 seconds**.
   * Playback start threshold: **2.5 seconds** | Buffer for rebuffer: **5 seconds**.
   * Back-buffer retention: **30 seconds** for instantaneous instant-replay without re-fetching.
-* **Interactive Luxury HUD:**
+* **Interactive HUD:**
   * Auto-hiding controls (4-second timeout).
-  * Double-tap to seek (±10s) with animated chevron feedback.
-  * Vertical swipe gestures for brightness (left) and volume (right).
+  * Double-tap left/right or the on-screen buttons to seek ±10 seconds.
   * Screen lock toggle to prevent accidental touches.
   * **Screen Rotation Button:** Instant toggle between Landscape and Portrait orientation with safe system reset on exit.
-  * Picture-in-Picture (PiP) support for seamless multitasking.
-* **Smart Resume:** Tracks watch progress automatically in Room DB; prompts to resume when video was watched between 5% and 95%.
+  * Picture-in-Picture (PiP) support, with the HUD automatically hidden while the video is docked.
+  * Playback speed menu (0.5x – 2x) and a configurable default speed.
+* **Smart Resume:** Tracks watch progress automatically in Room DB and resumes from the saved position (ignored when under 5 s watched or under 10 s remaining).
 
 ### 2. 📁 Intelligent Drive Browser
-* **Hierarchical Navigation:** Seamlessly traverse My Drive, Synced Computer Folders, and Shared Folders via parent IDs.
+* **Hierarchical Navigation:** Seamlessly traverse My Drive, Synced Computer Folders, and Shared Folders via parent IDs, with a tappable breadcrumb trail for jumping back up the path.
 * **Lightweight Video-Only Filter:** Automatically filters items to show only folders and video mime types (`video/*`), ignoring images, audio, and documents for blazing fast browsing.
 * **Global Drive Search:** Instant search across the entire Drive with 400ms debounce, querying only video files.
-* **Room Cache & Rate-Limiter:** 5-minute local cache for directory listings with pull-to-refresh and sliding-window rate-limiting.
+* **List & Grid Views:** Switch between a detail-rich list and a 2-column thumbnail grid; the choice is remembered across launches.
+* **Favorites:** Star any folder or video to pin it to the Home carousel and a dedicated Favorites screen.
+* **Room Cache & Rate-Limiter:** 5-minute local cache for directory listings with pull-to-refresh, remembered sort order, and sliding-window rate-limiting.
 * **CircuitBreaker Protection:** 3-state circuit breaker (`CLOSED`, `OPEN`, `HALF_OPEN`) protecting against Google Drive API quota lockouts upon consecutive network errors.
 
 ### 3. 📥 Download & Offline Viewing Engine
-* **Foreground Service (`dataSync`):** Persistent interactive notifications with live progress bars and Pause/Resume/Cancel controls.
+* **Foreground Service (`dataSync`):** Persistent interactive notifications with live progress bars and Pause/Resume/Cancel controls that stay on screen while a download is paused.
 * **Resumable HTTP Range Downloads:** Downloads write directly to `.part` files and resume from the exact byte offset if interrupted.
-* **Pre-flight Storage Verification:** Validates available disk space before starting downloads to avoid storage exhaustion.
+* **Pre-flight Storage Verification:** Validates available disk space before starting downloads; failures surface the real reason (out of space, network) directly on the download card instead of failing silently.
+* **Safe Deletion:** Removing a downloaded video asks for confirmation before deleting the local file.
 * **Automatic Local Playback Preference:** When tapping a video, the app automatically checks if a completed download exists locally on disk; if found, it plays from local storage with 0% network usage.
 
 ### 4. 🏠 Home Screen & Polished Experience
 * **Continue Watching Carousel:** Displays in-progress videos with thumbnail cards, remaining time, and progress bars.
-* **Quick Access Cards:** One-tap navigation to Drive Browser and Offline Downloads.
+* **Quick Access Cards:** One-tap navigation to Drive Browser (reopening the last visited folder) and Offline Downloads.
 * **Recent Watch History:** Comprehensive playback history with direct tap-to-play.
+* **Favorites Carousel:** Pinned folders and videos, with a "See all" shortcut to the Favorites screen.
+* **Settings Screen:** Default sort order, list/grid view mode, autoplay-next toggle, default playback speed, last-folder resume, Drive cache purge, watch-history purge, and app version.
 * **Edge-to-Edge Display:** Tailored `statusBarsPadding()` and `navigationBarsPadding()` preventing content clipping on notches, dynamic islands, or camera cutouts.
 * **Signature LMT Adaptive Icon:** Custom gold-on-dark luxury vector branding replacing standard Android defaults.
-* **Housekeeping Automation:** Background cleanup service running on app startup to purge stale HTTP cache (>7d), old watch logs (>90d), and orphaned partial downloads.
+* **Housekeeping Automation:** Background cleanup running on app startup to purge expired Drive cache entries, trim watch history, delete old crash reports, and drop orphaned download records.
 
 ---
 
@@ -78,7 +83,7 @@ Google Drive's built-in web interface and official mobile apps heavily compress 
 | Layer | Technologies |
 |---|---|
 | **Language & Tooling** | Kotlin 2.0.0, KSP 2.0.0-1.0.24, Android Gradle Plugin 8.5.2, Java 17 |
-| **UI Framework** | 100% Jetpack Compose (BOM 2024.08.00), Material 3 Dark Luxury theme |
+| **UI Framework** | 100% Jetpack Compose (BOM 2024.10.01), Material 3 Dark Luxury theme |
 | **Architecture** | MVVM + Clean Architecture + Unidirectional Data Flow (UDF) |
 | **Dependency Injection** | Dagger Hilt 2.51.1 |
 | **Media Playback** | AndroidX Media3 (ExoPlayer) 1.4.0, Media3 UI, Media3 DataSource |
@@ -94,9 +99,6 @@ Google Drive's built-in web interface and official mobile apps heavily compress 
 
 ```
 STREAMING/
-├── .agents/
-│   └── rules/
-│       └── coding-standards.md      # Engineering rules, security constraints & testing standards
 ├── app/
 │   ├── proguard-rules.pro           # R8 optimization & reflection preserve rules
 │   ├── src/
@@ -105,28 +107,27 @@ STREAMING/
 │   │   │   │   ├── auth/            # GoogleAuthManager, TokenManager, EncryptedTokenStorage
 │   │   │   │   ├── data/            # Room Database, DAOs, Entities, Converters, Repositories
 │   │   │   │   ├── di/              # Hilt Modules (AppModule, AuthModule, DatabaseModule, etc.)
-│   │   │   │   ├── download/        # DownloadManager, DownloadService, NotificationHandler
+│   │   │   │   ├── download/        # DownloadManager, DownloadService
 │   │   │   │   ├── maintenance/     # HousekeepingManager (cache & log purger)
 │   │   │   │   ├── network/         # TokenInterceptor, CircuitBreaker, RateLimiter, GDrive Remote
 │   │   │   │   ├── observability/   # PerfTracker, NetworkTracker
 │   │   │   │   ├── player/          # BufferConfig, GDriveDataSource, MediaSourceFactory
 │   │   │   │   └── ui/              # Compose UI
 │   │   │   │       ├── browser/     # DriveViewModel, DriveUiState
-│   │   │   │       ├── components/  # FileItemCard, NavigationBar, TopBars
+│   │   │   │       ├── components/  # FileItemCard, FolderCard, LoadingIndicator
+│   │   │   │       ├── download/    # DownloadViewModel, DownloadUiState
+│   │   │   │       ├── favorites/   # FavoritesViewModel
 │   │   │   │       ├── home/        # HomeViewModel, HomeUiState
 │   │   │   │       ├── navigation/  # NavGraph, Screen routes
-│   │   │   │       ├── player/      # PlayerViewModel, PlayerGestureOverlay
-│   │   │   │       ├── screens/     # LoginScreen, HomeScreen, BrowserScreen, PlayerScreen, DownloadsScreen
+│   │   │   │       ├── player/      # PlayerViewModel, PlayerUiState, PlaybackSpeeds
+│   │   │   │       ├── settings/    # SettingsViewModel, SettingsUiState
+│   │   │   │       ├── screens/     # Login, Home, Browser, Player, Downloads, Settings, Favorites
 │   │   │   │       └── theme/       # Dark Luxury Color, Typography, Shapes
 │   │   │   └── res/                 # Adaptive icons, drawables, strings, network security config
-│   │   └── test/                    # Comprehensive unit tests (MockK, Turbine, JUnit 5)
-├── config/
-│   └── detekt/detekt.yml            # Static code analysis configuration
-└── docs/
-    ├── TECHNICAL_REQUIREMENTS.md    # System specifications & functional requirements
-    ├── TESTING_STRATEGY.md          # Test matrices, mock data & quality criteria
-    ├── OPERATIONAL_GUIDE.md         # Deployment, Google Cloud setup & troubleshooting
-    └── walkthrough.md               # Continuous sprint implementation history
+│   │   └── test/                    # Unit tests (MockK, Turbine, JUnit 5, Truth)
+│   └── build.gradle.kts             # Module build config (R8, Detekt, JUnit Platform)
+└── config/
+    └── detekt/detekt.yml            # Static code analysis configuration
 ```
 
 ---
@@ -168,7 +169,7 @@ To enable personal Google Sign-In and Google Drive API access:
 ### Build Commands
 
 ```bash
-# 1. Run all unit tests (31 test suites across auth, network, player, download)
+# 1. Run all unit tests (auth, network, player, download, data, ui)
 ./gradlew testDebugUnitTest
 
 # 2. Run Detekt static analysis
@@ -220,6 +221,7 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 | **Sprint 4** | Download & Offline Engine (Foreground Service, Range resume, Local preference) | ✅ Completed |
 | **Sprint 5** | Home Screen & Hardening (Continue watching, CircuitBreaker, Housekeeping) | ✅ Completed |
 | **Polish** | Safe Insets (Status Bar), Player Rotation Toggle, Signature LMT Vector Icon | ✅ Completed |
+| **Personal UX Pass** | ±10s seek, Settings screen, persistent preferences, pull-to-refresh, grid view, breadcrumbs, favorites, download failure surfacing | ✅ Completed |
 
 ---
 

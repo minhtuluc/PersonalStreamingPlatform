@@ -28,8 +28,11 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FileDownloadDone
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircleOutline
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -37,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -57,9 +61,11 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.drivestream.app.R
 import com.drivestream.app.data.DownloadedVideoEntity
+import com.drivestream.app.data.FavoriteEntity
 import com.drivestream.app.data.WatchHistoryEntity
 import com.drivestream.app.ui.home.HomeUiState
 import com.drivestream.app.ui.home.HomeViewModel
+import com.drivestream.app.ui.theme.AccentAmber
 import com.drivestream.app.ui.theme.AccentBlue
 import com.drivestream.app.ui.theme.AccentGreen
 import com.drivestream.app.ui.theme.AccentTeal
@@ -74,6 +80,8 @@ private const val ACTION_CARD_HEIGHT = 100
 private const val CONTINUE_CARD_WIDTH = 220
 private const val CONTINUE_THUMB_HEIGHT = 120
 private const val DOWNLOAD_CARD_WIDTH = 200
+private const val FAVORITE_CARD_WIDTH = 180
+private const val FAVORITE_THUMB_HEIGHT = 100
 private const val ICON_SIZE_MEDIUM = 32
 private const val ICON_SIZE_SMALL = 20
 private const val MAX_RECENT_ITEMS_DISPLAY = 5
@@ -84,10 +92,12 @@ private const val MB_PER_GB = 1024.0
 
 @Composable
 fun HomeScreen(
-    onNavigateToBrowser: () -> Unit,
+    onNavigateToBrowser: (String, String) -> Unit,
     onNavigateToDownloads: () -> Unit,
     onPlayVideo: (String, String) -> Unit,
     onSignOut: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToFavorites: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -103,15 +113,20 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         item {
-            HomeHeader(onSignOut = {
-                viewModel.signOut()
-                onSignOut()
-            })
+            HomeHeader(
+                onOpenSettings = onNavigateToSettings,
+                onSignOut = {
+                    viewModel.signOut()
+                    onSignOut()
+                }
+            )
         }
 
         item {
             HomeActionCards(
-                onNavigateToBrowser = onNavigateToBrowser,
+                onNavigateToBrowser = {
+                    onNavigateToBrowser(uiState.browseStartFolderId, uiState.browseStartFolderName)
+                },
                 onNavigateToDownloads = onNavigateToDownloads
             )
         }
@@ -130,6 +145,22 @@ fun HomeScreen(
                 HomeDownloadsSection(
                     items = uiState.downloadedVideos,
                     onPlayVideo = onPlayVideo
+                )
+            }
+        }
+
+        if (uiState.favorites.isNotEmpty()) {
+            item {
+                FavoritesSection(
+                    items = uiState.favorites,
+                    onOpen = { favorite ->
+                        if (favorite.isFolder) {
+                            onNavigateToBrowser(favorite.fileId, favorite.fileName)
+                        } else {
+                            onPlayVideo(favorite.fileId, favorite.fileName)
+                        }
+                    },
+                    onSeeAll = onNavigateToFavorites
                 )
             }
         }
@@ -156,7 +187,10 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader(onSignOut: () -> Unit) {
+private fun HomeHeader(
+    onOpenSettings: () -> Unit,
+    onSignOut: () -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -175,12 +209,21 @@ private fun HomeHeader(onSignOut: () -> Unit) {
                 color = TextSecondary
             )
         }
-        IconButton(onClick = onSignOut) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.Logout,
-                contentDescription = "Sign Out",
-                tint = TextSecondary
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onOpenSettings) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = stringResource(R.string.settings_open),
+                    tint = TextSecondary
+                )
+            }
+            IconButton(onClick = onSignOut) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                    contentDescription = "Sign Out",
+                    tint = TextSecondary
+                )
+            }
         }
     }
 }
@@ -416,6 +459,111 @@ private fun HomeDownloadCard(
                 fontSize = 11.sp,
                 color = TextSecondary
             )
+        }
+    }
+}
+
+@Composable
+private fun FavoritesSection(
+    items: List<FavoriteEntity>,
+    onOpen: (FavoriteEntity) -> Unit,
+    onSeeAll: () -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = AccentAmber,
+                    modifier = Modifier.size(ICON_SIZE_SMALL.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.favorites_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            }
+            TextButton(onClick = onSeeAll) {
+                Text(
+                    text = stringResource(R.string.favorites_see_all),
+                    color = AccentBlue
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            items(items, key = { it.fileId }) { favorite ->
+                FavoriteCard(favorite = favorite, onClick = { onOpen(favorite) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun FavoriteCard(
+    favorite: FavoriteEntity,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.width(FAVORITE_CARD_WIDTH.dp),
+        shape = RoundedCornerShape(CARD_CORNER_RADIUS.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkElevated)
+    ) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(FAVORITE_THUMB_HEIGHT.dp)
+                    .background(Color.Black.copy(alpha = 0.4f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!favorite.thumbnailUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(favorite.thumbnailUrl)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = favorite.fileName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                Icon(
+                    imageVector = if (favorite.isFolder) Icons.Default.Folder else Icons.Default.Movie,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+
+            Column(modifier = Modifier.padding(10.dp)) {
+                Text(
+                    text = favorite.fileName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (favorite.isFolder) {
+                        stringResource(R.string.favorites_folder_label)
+                    } else {
+                        formatBytes(favorite.fileSize)
+                    },
+                    fontSize = 11.sp,
+                    color = TextSecondary
+                )
+            }
         }
     }
 }

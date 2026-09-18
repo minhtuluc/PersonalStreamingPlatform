@@ -3,8 +3,12 @@ package com.drivestream.app.ui.browser
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.drivestream.app.data.AppSettings
+import com.drivestream.app.data.BrowseViewMode
 import com.drivestream.app.data.DownloadRepository
 import com.drivestream.app.data.DriveRepository
+import com.drivestream.app.data.FavoritesRepository
+import com.drivestream.app.data.SettingsRepository
 import com.drivestream.app.data.model.DriveFile
 import com.drivestream.app.data.model.FileSortOption
 import com.drivestream.app.player.PlayerPlaylistManager
@@ -14,14 +18,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@Suppress("TooManyFunctions")
 @HiltViewModel
 class DriveViewModel @Inject constructor(
     private val driveRepository: DriveRepository,
     savedStateHandle: SavedStateHandle,
+    private val settingsRepository: SettingsRepository,
+    private val favoritesRepository: FavoritesRepository,
     private val downloadRepository: DownloadRepository? = null,
     private val playlistManager: PlayerPlaylistManager? = null
 ) : ViewModel() {
@@ -35,7 +43,9 @@ class DriveViewModel @Inject constructor(
         DriveUiState(
             folderId = folderId,
             folderName = folderName,
-            isLoading = true
+            isLoading = true,
+            sortOption = settingsRepository.settings.value.sortOption,
+            viewMode = settingsRepository.settings.value.viewMode
         )
     )
     val uiState: StateFlow<DriveUiState> = _uiState.asStateFlow()
@@ -44,6 +54,21 @@ class DriveViewModel @Inject constructor(
 
     init {
         loadFolderFiles(forceRefresh = false)
+        observeFavoriteIds()
+    }
+
+    private fun observeFavoriteIds() {
+        viewModelScope.launch {
+            favoritesRepository.favoriteIds().collect { ids ->
+                _uiState.update { it.copy(favoriteIds = ids.toSet()) }
+            }
+        }
+    }
+
+    fun toggleFavorite(file: DriveFile) {
+        viewModelScope.launch {
+            favoritesRepository.toggle(file)
+        }
     }
 
     fun loadFolderFiles(forceRefresh: Boolean = false) {
@@ -75,6 +100,7 @@ class DriveViewModel @Inject constructor(
                             errorMessage = null
                         )
                     }
+                    settingsRepository.setLastFolder(folderId, folderName)
                 },
                 onFailure = { error ->
                     _uiState.update {
@@ -185,6 +211,17 @@ class DriveViewModel @Inject constructor(
                 sortOption = option
             )
         }
+        settingsRepository.setSortOption(option)
+    }
+
+    fun toggleViewMode() {
+        val nextMode = if (_uiState.value.viewMode == BrowseViewMode.GRID) {
+            BrowseViewMode.LIST
+        } else {
+            BrowseViewMode.GRID
+        }
+        _uiState.update { it.copy(viewMode = nextMode) }
+        settingsRepository.setViewMode(nextMode)
     }
 
     private fun sortFiles(files: List<DriveFile>, option: FileSortOption): List<DriveFile> {
@@ -245,8 +282,8 @@ class DriveViewModel @Inject constructor(
     }
 
     companion object {
-        const val DEFAULT_FOLDER_ID = "root"
-        const val DEFAULT_FOLDER_NAME = "My Drive"
+        const val DEFAULT_FOLDER_ID = AppSettings.DEFAULT_FOLDER_ID
+        const val DEFAULT_FOLDER_NAME = AppSettings.DEFAULT_FOLDER_NAME
         const val SEARCH_DEBOUNCE_MS = 400L
     }
 }

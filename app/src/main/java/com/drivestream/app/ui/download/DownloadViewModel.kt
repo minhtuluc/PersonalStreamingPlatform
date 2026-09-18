@@ -64,7 +64,8 @@ class DownloadViewModel @Inject constructor(
             downloadedBytes = currentBytes,
             status = currentStatus,
             downloadedAt = entity.downloadedAt,
-            progressFraction = fraction
+            progressFraction = fraction,
+            failure = activeProgress?.failure
         )
     }
 

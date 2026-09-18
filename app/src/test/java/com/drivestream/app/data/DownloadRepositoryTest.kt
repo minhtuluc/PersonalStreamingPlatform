@@ -135,9 +135,15 @@ class DownloadRepositoryTest {
     @Test
     @DisplayName("totalStorageUsed delegates to dao flow")
     fun totalStorageUsedDelegation() = runTest {
-        every { dao.getTotalStorageUsed() } returns flowOf(1024L * 1024L * 500L)
+        val expectedTotalBytes = 1024L * 1024L * 500L
+        every { dao.getTotalStorageUsed() } returns flowOf(expectedTotalBytes)
 
-        val total = repository.totalStorageUsed.first()
-        assertThat(total).isEqualTo(1024L * 1024L * 500L)
+        val repositoryWithStubbedDao = DownloadRepository(
+            context = context,
+            downloadedVideoDao = dao,
+            downloadManager = downloadManager
+        )
+
+        assertThat(repositoryWithStubbedDao.totalStorageUsed.first()).isEqualTo(expectedTotalBytes)
     }
 }

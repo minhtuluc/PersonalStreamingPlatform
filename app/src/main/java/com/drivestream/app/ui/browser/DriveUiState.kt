@@ -1,5 +1,6 @@
 package com.drivestream.app.ui.browser
 
+import com.drivestream.app.data.BrowseViewMode
 import com.drivestream.app.data.model.DriveFile
 import com.drivestream.app.data.model.FileSortOption
 
@@ -14,7 +15,9 @@ data class DriveUiState(
     val searchQuery: String = "",
     val isSearching: Boolean = false,
     val errorMessage: String? = null,
-    val sortOption: FileSortOption = FileSortOption.NAME_ASC
+    val sortOption: FileSortOption = FileSortOption.NAME_ASC,
+    val viewMode: BrowseViewMode = BrowseViewMode.LIST,
+    val favoriteIds: Set<String> = emptySet()
 ) {
     val isEmpty: Boolean
         get() = files.isEmpty() && !isLoading && !isRefreshing && errorMessage == null
