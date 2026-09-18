@@ -1,232 +1,227 @@
-# DriveStream 🎬
+# DriveStream
 
-> **Native 4K HDR Video Streaming & Offline Player directly from Personal Google Drive to Android.**  
-> Zero transcoding, original bitrates, custom chunk buffering, hardware-backed security, and Dark Luxury UI.
+> **Xem và tải video từ Google Drive cá nhân trên Android — nguyên chất lượng gốc, không transcode.**
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
-[![Android Gradle Plugin](https://img.shields.io/badge/AGP-8.5.2-green.svg?style=flat&logo=android)](https://developer.android.com/studio/releases/gradle-plugin)
-[![Compose BOM](https://img.shields.io/badge/Compose_BOM-2024.08.00-blue.svg?style=flat&logo=jetpackcompose)](https://developer.android.com/jetpack/compose)
-[![Media3 ExoPlayer](https://img.shields.io/badge/Media3_ExoPlayer-1.4.0-red.svg?style=flat)](https://developer.android.com/media/media3)
-[![License](https://img.shields.io/badge/License-Personal_Use_Only-orange.svg)](#-license--disclaimer)
+📥 **Tải bản mới nhất:** [Releases](https://github.com/minhtuluc/PersonalStreamingPlatform/releases/latest)
 
 ---
 
-## 🌟 Overview
+## Giới thiệu
 
-Google Drive's built-in web interface and official mobile apps heavily compress and transcode uploaded videos down to low-bitrate 720p or 1080p, completely stripping HDR metadata and original audio tracks.
+Google Drive không có sẵn một trình phát video tử tế: tua chậm, không nhớ đang xem dở, không tải về xem offline, và bản web thường hạ chất lượng khi phát.
 
-**DriveStream** is an open-source, private Android media client crafted for personal Google Drive / Google One users (e.g., 2TB – 30TB tiers) to stream and download their original video libraries (MP4, MKV, MOV up to 4K 60fps HDR) directly:
-* **No Server Intermediary:** Direct client-to-Google-storage connection via Google Drive API v3.
-* **Zero Quality Loss:** Streams raw byte ranges without server-side transcoding or re-encoding.
-* **Intelligent Buffering:** Custom chunked range requests and back-buffers preventing Google API rate limits (`HTTP 429`).
-* **Offline-First Playback:** Full background download manager with resume support and automatic local playback preference.
+**DriveStream** là ứng dụng Android dành riêng cho **một người dùng** — chủ sở hữu tài khoản Google Drive — để:
 
----
+* **Phát trực tiếp** video trong Drive ở **đúng chất lượng đã upload** (MP4, MKV, MOV… tới 4K), không qua server trung gian, không re-encode.
+* **Tải về máy** để xem offline, hỗ trợ tạm dừng và tiếp tục.
+* **Nhớ vị trí đang xem** để hôm sau mở lên là xem tiếp đúng chỗ.
+* **Duyệt Drive** như một thư viện phim: tìm kiếm, sắp xếp, đánh dấu yêu thích.
 
-## 🚀 Key Features
-
-### 1. 🎬 High-Performance Video Player
-* **Media3 ExoPlayer Integration:** Custom `GDriveDataSource` handling HTTP Range requests (`206 Partial Content`) with Bearer token injection.
-* **Tailored Buffer Profile:**
-  * Minimum buffer: **30 seconds** | Maximum buffer: **90 seconds**.
-  * Playback start threshold: **2.5 seconds** | Buffer for rebuffer: **5 seconds**.
-  * Back-buffer retention: **30 seconds** for instantaneous instant-replay without re-fetching.
-* **Interactive HUD:**
-  * Auto-hiding controls (4-second timeout).
-  * Double-tap left/right or the on-screen buttons to seek ±10 seconds.
-  * Screen lock toggle to prevent accidental touches.
-  * **Screen Rotation Button:** Instant toggle between Landscape and Portrait orientation with safe system reset on exit.
-  * Picture-in-Picture (PiP) support, with the HUD automatically hidden while the video is docked.
-  * Playback speed menu (0.5x – 2x) and a configurable default speed.
-* **Smart Resume:** Tracks watch progress automatically in Room DB and resumes from the saved position (ignored when under 5 s watched or under 10 s remaining).
-
-### 2. 📁 Intelligent Drive Browser
-* **Hierarchical Navigation:** Seamlessly traverse My Drive, Synced Computer Folders, and Shared Folders via parent IDs, with a tappable breadcrumb trail for jumping back up the path.
-* **Lightweight Video-Only Filter:** Automatically filters items to show only folders and video mime types (`video/*`), ignoring images, audio, and documents for blazing fast browsing.
-* **Global Drive Search:** Instant search across the entire Drive with 400ms debounce, querying only video files.
-* **List & Grid Views:** Switch between a detail-rich list and a 2-column thumbnail grid; the choice is remembered across launches.
-* **Favorites:** Star any folder or video to pin it to the Home carousel and a dedicated Favorites screen.
-* **Room Cache & Rate-Limiter:** 5-minute local cache for directory listings with pull-to-refresh, remembered sort order, and sliding-window rate-limiting.
-* **CircuitBreaker Protection:** 3-state circuit breaker (`CLOSED`, `OPEN`, `HALF_OPEN`) protecting against Google Drive API quota lockouts upon consecutive network errors.
-
-### 3. 📥 Download & Offline Viewing Engine
-* **Foreground Service (`dataSync`):** Persistent interactive notifications with live progress bars and Pause/Resume/Cancel controls that stay on screen while a download is paused.
-* **Resumable HTTP Range Downloads:** Downloads write directly to `.part` files and resume from the exact byte offset if interrupted.
-* **Pre-flight Storage Verification:** Validates available disk space before starting downloads; failures surface the real reason (out of space, network) directly on the download card instead of failing silently.
-* **Safe Deletion:** Removing a downloaded video asks for confirmation before deleting the local file.
-* **Automatic Local Playback Preference:** When tapping a video, the app automatically checks if a completed download exists locally on disk; if found, it plays from local storage with 0% network usage.
-
-### 4. 🏠 Home Screen & Polished Experience
-* **Continue Watching Carousel:** Displays in-progress videos with thumbnail cards, remaining time, and progress bars.
-* **Quick Access Cards:** One-tap navigation to Drive Browser (reopening the last visited folder) and Offline Downloads.
-* **Recent Watch History:** Comprehensive playback history with direct tap-to-play.
-* **Favorites Carousel:** Pinned folders and videos, with a "See all" shortcut to the Favorites screen.
-* **Settings Screen:** Default sort order, list/grid view mode, autoplay-next toggle, default playback speed, last-folder resume, Drive cache purge, watch-history purge, and app version.
-* **Edge-to-Edge Display:** Tailored `statusBarsPadding()` and `navigationBarsPadding()` preventing content clipping on notches, dynamic islands, or camera cutouts.
-* **Signature LMT Adaptive Icon:** Custom gold-on-dark luxury vector branding replacing standard Android defaults.
-* **Housekeeping Automation:** Background cleanup running on app startup to purge expired Drive cache entries, trim watch history, delete old crash reports, and drop orphaned download records.
+Ứng dụng kết nối trực tiếp từ điện thoại tới Google Drive bằng API chính thức, chỉ xin quyền **đọc**. Không có máy chủ nào ở giữa, không upload gì lên đâu cả.
 
 ---
 
-## 🛡️ Security & Privacy Architecture
+## Tính năng
 
-* **Strict Minimal OAuth Scope:** Requests exclusively `https://www.googleapis.com/auth/drive.readonly`. The app has **zero write permissions** and **zero delete permissions**.
-* **Zero Public Link Sharing:** Videos are streamed strictly using temporary, authenticated OAuth 2.0 Bearer tokens. Files are never set to public or shared externally.
-* **Hardware-Backed Cryptography:** Tokens and session metadata are stored in `EncryptedSharedPreferences` backed by the Android Keystore (`MasterKeys.AES256_GCM`).
-* **Proactive Silent Token Refresh:** Tokens are automatically refreshed in the background when less than 300 seconds of validity remain, preventing playback freezes.
-* **Concurrency Deduplication:** Mutex-based double-checked locking prevents multiple parallel network requests from triggering redundant token refresh calls.
+### 🎬 Trình phát video
+* Phát video **nguyên chất lượng gốc**, tua tới/lùi mượt nhờ đọc từng đoạn byte (HTTP Range) thay vì tải cả file.
+* **Tua nhanh ±10 giây** bằng chạm hai lần vào hai bên màn hình, hoặc dùng nút trên màn hình.
+* **Tốc độ phát 0.5x – 2x**, có thể đặt tốc độ mặc định trong Cài đặt.
+* **Nhớ vị trí xem** — tự lưu khi đang xem, khi tạm dừng và khi thoát; mở lại là xem tiếp.
+* **Tự phát video kế tiếp** khi hết video (có thể tắt).
+* **Khoá điều khiển** để tránh chạm nhầm khi đang xem.
+* **Xoay màn hình** ngang/dọc bằng một nút.
+* **Picture-in-Picture** — thu nhỏ thành cửa sổ nổi để vừa xem vừa làm việc khác.
+* Ưu tiên phát **file đã tải về máy** nếu có, không tốn dữ liệu mạng.
+
+### 📁 Duyệt Drive
+* Chỉ hiển thị **thư mục và video**, tự động ẩn ảnh, nhạc, tài liệu cho gọn.
+* **Breadcrumb** ở thanh tiêu đề — bấm vào tên thư mục cha để nhảy thẳng lên cấp trên.
+* **Danh sách hoặc lưới** tuỳ thích, được ghi nhớ cho lần sau.
+* **Tìm kiếm toàn bộ Drive** theo tên video.
+* **Sắp xếp** theo tên, ngày sửa hoặc dung lượng; nhớ thứ tự đã chọn.
+* **Kéo xuống để làm mới** danh sách.
+
+### 📥 Tải về xem offline
+* Tải chạy nền, có thanh tiến trình trên thanh thông báo.
+* **Tạm dừng / tiếp tục / huỷ** ngay từ thông báo, kể cả khi đã thoát app.
+* **Tải tiếp từ đúng chỗ đã dừng** nếu bị ngắt mạng.
+* Kiểm tra dung lượng trước khi tải; nếu thất bại thì hiện rõ lý do (hết dung lượng, lỗi mạng) ngay trên thẻ tải về.
+* Xoá video đã tải sẽ hỏi xác nhận trước.
+
+### ⭐ Yêu thích & Trang chủ
+* **Gắn sao** cho cả thư mục lẫn video để mở nhanh.
+* **Tiếp tục xem** — các video đang xem dở, kèm thời gian còn lại.
+* **Video đã tải** — kho phim offline của bạn.
+* **Yêu thích** và **Xem gần đây** — lịch sử xem, bấm là xem lại.
 
 ---
 
-## 🛠 Tech Stack
+## Yêu cầu
 
-| Layer | Technologies |
+| | |
 |---|---|
-| **Language & Tooling** | Kotlin 2.0.0, KSP 2.0.0-1.0.24, Android Gradle Plugin 8.5.2, Java 17 |
-| **UI Framework** | 100% Jetpack Compose (BOM 2024.10.01), Material 3 Dark Luxury theme |
-| **Architecture** | MVVM + Clean Architecture + Unidirectional Data Flow (UDF) |
-| **Dependency Injection** | Dagger Hilt 2.51.1 |
-| **Media Playback** | AndroidX Media3 (ExoPlayer) 1.4.0, Media3 UI, Media3 DataSource |
-| **Local Persistence** | AndroidX Room 2.6.1 (SQLite with Coroutines Flow & TypeConverters) |
-| **Networking & HTTP** | OkHttp 4.12.0, Custom Interceptors, Google API Client Android 2.6.0, Google Drive API v3 |
-| **Security** | AndroidX Security Crypto 1.1.0-alpha06 (Keystore AES256_GCM) |
-| **Image Loading** | Coil Compose 2.7.0 |
-| **Code Quality & Testing** | Detekt 1.23.6, Android Lint, JUnit 5, MockK 1.13.12, Turbine 1.1.0, MockWebServer, Google Truth |
+| **Hệ điều hành** | Android 8.0 (API 26) trở lên |
+| **Tài khoản** | Một tài khoản Google có chứa video trong Drive |
+| **Mạng** | Cần mạng khi xem trực tuyến; video đã tải thì xem offline được |
+| **Dung lượng** | Chỉ cần khi bạn muốn tải video về máy |
 
 ---
 
-## 📂 Project Structure
+## Cài đặt
 
+1. Tải file `DriveStream-x.y.z.apk` ở mục [Releases](https://github.com/minhtuluc/PersonalStreamingPlatform/releases/latest).
+2. Mở file APK trên điện thoại, bật **"Cài đặt ứng dụng không rõ nguồn gốc"** nếu máy hỏi.
+3. Hoặc cài qua ADB:
+
+```bash
+adb install -r DriveStream-1.0.0.apk
 ```
-STREAMING/
-├── app/
-│   ├── proguard-rules.pro           # R8 optimization & reflection preserve rules
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── java/com/drivestream/app/
-│   │   │   │   ├── auth/            # GoogleAuthManager, TokenManager, EncryptedTokenStorage
-│   │   │   │   ├── data/            # Room Database, DAOs, Entities, Converters, Repositories
-│   │   │   │   ├── di/              # Hilt Modules (AppModule, AuthModule, DatabaseModule, etc.)
-│   │   │   │   ├── download/        # DownloadManager, DownloadService
-│   │   │   │   ├── maintenance/     # HousekeepingManager (cache & log purger)
-│   │   │   │   ├── network/         # TokenInterceptor, CircuitBreaker, RateLimiter, GDrive Remote
-│   │   │   │   ├── observability/   # PerfTracker, NetworkTracker
-│   │   │   │   ├── player/          # BufferConfig, GDriveDataSource, MediaSourceFactory
-│   │   │   │   └── ui/              # Compose UI
-│   │   │   │       ├── browser/     # DriveViewModel, DriveUiState
-│   │   │   │       ├── components/  # FileItemCard, FolderCard, LoadingIndicator
-│   │   │   │       ├── download/    # DownloadViewModel, DownloadUiState
-│   │   │   │       ├── favorites/   # FavoritesViewModel
-│   │   │   │       ├── home/        # HomeViewModel, HomeUiState
-│   │   │   │       ├── navigation/  # NavGraph, Screen routes
-│   │   │   │       ├── player/      # PlayerViewModel, PlayerUiState, PlaybackSpeeds
-│   │   │   │       ├── settings/    # SettingsViewModel, SettingsUiState
-│   │   │   │       ├── screens/     # Login, Home, Browser, Player, Downloads, Settings, Favorites
-│   │   │   │       └── theme/       # Dark Luxury Color, Typography, Shapes
-│   │   │   └── res/                 # Adaptive icons, drawables, strings, network security config
-│   │   └── test/                    # Unit tests (MockK, Turbine, JUnit 5, Truth)
-│   └── build.gradle.kts             # Module build config (R8, Detekt, JUnit Platform)
-└── config/
-    └── detekt/detekt.yml            # Static code analysis configuration
-```
+
+4. Khi mở app lần đầu, **cho phép gửi thông báo** (Android 13+) để thấy tiến trình tải.
+
+> APK được ký bằng debug keystore của dự án nên cài trực tiếp được, không cần qua Google Play.
 
 ---
 
-## ⚙️ Google Cloud Console Setup
+## Hướng dẫn sử dụng
 
-To enable personal Google Sign-In and Google Drive API access:
+### 1. Đăng nhập
+Mở app → bấm **Đăng nhập bằng Google** → chọn tài khoản → đồng ý cho app **quyền đọc Drive**. Sau lần đầu, app ghi nhớ phiên đăng nhập và mở thẳng vào Trang chủ.
 
-1. **Create / Select a Project:**
-   * Open [Google Cloud Console](https://console.cloud.google.com/).
-   * Create a new project (e.g., `PersonalStreamingPlatform`).
-2. **Enable Google Drive API:**
-   * Navigate to **APIs & Services > Library**.
-   * Search for **Google Drive API** and click **Enable**.
-3. **Configure OAuth Consent Screen:**
-   * Go to **APIs & Services > OAuth consent screen**.
-   * Select User Type: **External** (for personal @gmail.com accounts).
-   * Fill in required app details (App name: `DriveStream`, User support email).
-   * **Scopes:** Add `https://www.googleapis.com/auth/drive.readonly`.
-   * **Test Users:** Add the specific Gmail address(es) that will be logging into the app. *(Crucial: While in Testing status, only accounts listed here can log in!)*
-4. **Create Android OAuth 2.0 Client ID:**
-   * Go to **APIs & Services > Credentials > Create Credentials > OAuth client ID**.
-   * Application type: **Android**.
-   * **Package name:** `com.drivestream.app`
-   * **SHA-1 certificate fingerprint:** Extract your debug/release keystore fingerprint:
-     ```powershell
-     # For debug keystore:
-     keytool -list -v -keystore $env:USERPROFILE\.android\debug.keystore -alias androiddebugkey -storepass android -keypass android
+### 2. Trang chủ
+* Góc trên bên phải có nút **⚙ Cài đặt** và nút **Đăng xuất**.
+* Hai thẻ lớn: **Duyệt Drive** (mở lại thư mục xem lần trước nếu bật trong Cài đặt) và **Đã tải**.
+* Bên dưới là các mục **Tiếp tục xem**, **Video đã tải**, **Yêu thích**, **Xem gần đây** — chạm vào bất kỳ thẻ nào để xem.
+
+### 3. Duyệt Drive
+| Thao tác | Kết quả |
+|---|---|
+| Chạm vào thư mục | Mở thư mục đó |
+| Chạm vào video | Phát video |
+| Chạm tên thư mục trên breadcrumb | Nhảy lên cấp trên |
+| 🔍 | Tìm kiếm video trên toàn Drive |
+| ▦ | Đổi giữa danh sách và lưới |
+| ⇅ | Chọn cách sắp xếp |
+| ⟳ | Làm mới danh sách |
+| ⭐ trên mỗi mục | Thêm/bỏ khỏi Yêu thích |
+| ⬇ trên mỗi video | Tải video về máy |
+| Kéo danh sách xuống | Làm mới |
+
+### 4. Xem video
+Điều khiển tự ẩn sau 4 giây, chạm một lần vào màn hình để hiện lại.
+
+| Thao tác | Kết quả |
+|---|---|
+| Chạm 1 lần | Hiện/ẩn điều khiển |
+| Chạm 2 lần bên **trái** | Tua lại 10 giây |
+| Chạm 2 lần bên **phải** | Tua tới 10 giây |
+| Kéo thanh tiến trình | Tua tới vị trí bất kỳ |
+| Nút tốc độ | Chọn 0.5x – 2x |
+| ⏮ / ⏭ | Video trước / video kế tiếp trong thư mục |
+| Nút PiP | Thu nhỏ thành cửa sổ nổi |
+| Nút xoay | Đổi ngang/dọc |
+| Nút khoá | Khoá điều khiển (bấm nút khoá lần nữa hoặc nút Back để mở) |
+
+Vị trí đang xem được **lưu tự động** (trong lúc phát, khi tạm dừng và khi thoát). Lần sau mở lại, app **xem tiếp từ đúng chỗ dừng** — trừ khi bạn mới xem dưới 5 giây hoặc còn dưới 10 giây nữa là hết video.
+
+### 5. Tải video về máy
+1. Trong Duyệt Drive, bấm biểu tượng **⬇** trên video cần tải.
+2. Theo dõi tiến trình ở thanh thông báo hoặc vào mục **Đã tải** trên Trang chủ.
+3. Bấm **Tạm dừng / Tiếp tục** ngay trên thông báo khi cần.
+4. Video tải xong sẽ có nhãn **Offline** và tự động phát từ bộ nhớ máy.
+5. Muốn xoá: vào **Đã tải** → bấm thùng rác → xác nhận.
+
+### 6. Yêu thích
+Gắn sao cho thư mục hoặc video ngay trong Duyệt Drive. Các mục đã gắn sao xuất hiện ở mục **Yêu thích** trên Trang chủ; bấm **Xem tất cả** để mở danh sách đầy đủ và bỏ yêu thích ở đó.
+
+### 7. Cài đặt trong app
+
+| Mục | Ý nghĩa |
+|---|---|
+| **Sắp xếp mặc định** | Thứ tự sắp xếp khi mở một thư mục |
+| **Chế độ xem** | Danh sách hoặc Lưới |
+| **Tự động phát video kế tiếp** | Hết video thì tự chạy video tiếp theo trong thư mục |
+| **Tốc độ phát mặc định** | Tốc độ áp dụng khi bắt đầu phát |
+| **Mở lại thư mục lần cuối** | Bấm "Duyệt Drive" sẽ vào đúng thư mục vừa xem dở |
+| **Xoá cache Drive** | Xoá danh sách thư mục và ảnh thu nhỏ đã lưu; sẽ tải lại từ Drive |
+| **Xoá lịch sử xem** | Xoá toàn bộ lịch sử, mục "Tiếp tục xem" và "Xem gần đây" |
+| **Phiên bản ứng dụng** | Phiên bản đang cài |
+| **Đăng xuất** | Xoá phiên đăng nhập khỏi máy |
+
+---
+
+## Xử lý sự cố
+
+**Đăng nhập thất bại, hoặc màn hình đăng nhập tự tắt trên Xiaomi (MIUI / HyperOS)**
+* Tài khoản Google chưa được thêm vào **Test users** trong Google Cloud Console (bắt buộc khi ứng dụng OAuth còn ở trạng thái *Testing*).
+* Vào *Cài đặt > Tài khoản & đồng bộ > Dịch vụ Google cơ bản* và bật lên.
+* Vào *Cài đặt > Ứng dụng > DriveStream > Quyền khác*, bật **"Lấy thông tin tài khoản"** và **"Hiển thị cửa sổ bật lên khi chạy nền"**.
+
+**Xem video báo lỗi 401 / 403**
+* Kiểm tra **Google Drive API** đã được bật trong Google Cloud Console.
+* Vào Trang chủ → **Đăng xuất** → đăng nhập lại để lấy token mới.
+
+**Không cài được bản debug**
+Bản debug có tên gói khác (`com.drivestream.app.debug`), nên muốn đăng nhập được thì phải đăng ký thêm một **OAuth client ID** riêng trong Google Cloud Console với đúng tên gói đó. Cách đơn giản nhất là dùng bản **release**.
+
+**Tải video thất bại**
+* Thẻ tải về hiện rõ nguyên nhân: **"Bộ nhớ máy không đủ dung lượng"** → xoá bớt file đã tải; **"Lỗi kết nối"** → kiểm tra mạng rồi bấm thử lại.
+* Google Drive có giới hạn tốc độ truy cập; nếu tải chậm hoặc bị ngắt giữa chừng, chờ vài phút rồi tải tiếp — app sẽ tải tiếp từ đúng chỗ đã dừng.
+
+**Video không phát được**
+Một số định dạng/độ phân giải mà chip của máy không giải mã được (ví dụ HEVC 10-bit, 4K với máy yếu) sẽ báo lỗi khi phát. Cách xử lý: tải video về máy rồi phát, hoặc chọn bản encode nhẹ hơn.
+
+**Drive hiện thiếu file**
+Danh sách được lưu tạm 5 phút. Kéo xuống để làm mới, hoặc vào **Cài đặt → Xoá cache Drive**.
+
+---
+
+## Quyền riêng tư
+
+* Ứng dụng chỉ xin **một quyền duy nhất**: `drive.readonly` — **chỉ đọc**. Không có quyền ghi, sửa, xoá hay chia sẻ file trên Drive của bạn.
+* Video được phát bằng **token truy cập tạm thời**; file không bao giờ bị đặt ở chế độ công khai.
+* Token đăng nhập được lưu **mã hoá bằng Android Keystore** trên chính thiết bị.
+* Không có máy chủ trung gian: dữ liệu đi thẳng giữa điện thoại và Google.
+* Gỡ ứng dụng là toàn bộ dữ liệu cục bộ (lịch sử xem, video đã tải, token) bị xoá theo.
+
+---
+
+## Thiết lập Google Cloud (chỉ cần làm một lần)
+
+Ứng dụng cần một **OAuth client ID** thuộc sở hữu của bạn mới đăng nhập được:
+
+1. Mở [Google Cloud Console](https://console.cloud.google.com/) → tạo project mới.
+2. **APIs & Services > Library** → tìm **Google Drive API** → **Enable**.
+3. **APIs & Services > OAuth consent screen**:
+   * User Type: **External**.
+   * Scopes: thêm `https://www.googleapis.com/auth/drive.readonly`.
+   * **Test users**: thêm địa chỉ Gmail sẽ đăng nhập vào app. *(Bắt buộc — khi ứng dụng còn ở trạng thái Testing, chỉ những tài khoản trong danh sách này đăng nhập được.)*
+4. **APIs & Services > Credentials > Create Credentials > OAuth client ID**:
+   * Application type: **Android**
+   * Package name: `com.drivestream.app`
+   * SHA-1: lấy từ keystore dùng để ký APK
+     ```bash
+     keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
      ```
 
 ---
 
-## 🔧 Building & Deployment
+## Tự build từ mã nguồn
 
-### Prerequisites
-* JDK 17 or JDK 21 configured (`JAVA_HOME`).
-* Android SDK Platform 35 and Build Tools installed.
-
-### Build Commands
+Cần **JDK 17/21** và **Android SDK Platform 35**:
 
 ```bash
-# 1. Run all unit tests (auth, network, player, download, data, ui)
-./gradlew testDebugUnitTest
-
-# 2. Run Detekt static analysis
-./gradlew detekt
-
-# 3. Run Android Lint check
-./gradlew lintDebug
-
-# 4. Build Debug APK (Package: com.drivestream.app.debug)
-./gradlew assembleDebug
-
-# 5. Build Optimized Release APK with R8 Minification & Resource Shrinking (~4.3MB)
-./gradlew assembleRelease
+./gradlew assembleRelease   # APK ở app/build/outputs/apk/release/app-release.apk
+./gradlew testDebugUnitTest # chạy unit test
 ```
 
-### APK Output Paths
-* **Release APK:** `app/build/outputs/apk/release/app-release.apk`
-* **Debug APK:** `app/build/outputs/apk/debug/app-debug.apk`
+Nếu build trên Windows và Gradle báo sai phiên bản Java, mở `gradle.properties` và bỏ dấu `#` ở dòng `org.gradle.java.home` rồi trỏ tới JDK 17/21 trên máy.
 
 ---
 
-## 📱 Device Deployment & Troubleshooting
+## Giấy phép & miễn trừ
 
-### Sideloading via ADB
-```bash
-adb install -r app/build/outputs/apk/release/app-release.apk
-```
-
-### Common Issues & Tips
-
-* **Login Fails / Immediately Disappears on Xiaomi (MIUI / HyperOS):**
-  * **Cause 1 (Test Users):** Ensure the logged-in Gmail is added to **Test users** in Google Cloud Console.
-  * **Cause 2 (Google Services):** Go to *Settings > Accounts & Sync > Basic Google services* and ensure it is **ON**.
-  * **Cause 3 (Account Permissions):** Go to *Settings > Apps > Manage Apps > DriveStream > Permissions / Other Permissions*, and enable **"Get account info"** and **"Display pop-up windows while running in the background"**.
-* **Video Playback Fails with 401 / 403:**
-  * Verify that the Google Drive API is Enabled in your Google Cloud Project.
-  * In the app, tap Sign Out from the Home screen and log in again to trigger fresh token retrieval.
-
----
-
-## 📋 Production Status
-
-| Phase | Description | Status |
-|---|---|---|
-| **Sprint 0** | Project Foundation, Toolchain, Theme, Room DB, Navigation | ✅ Completed |
-| **Sprint 1** | Authentication & Token Lifecycle (AES256, Silent Refresh, 401 Retry) | ✅ Completed |
-| **Sprint 2** | Drive File Browser (Hierarchy, Video filter, Debounce search, Cache) | ✅ Completed |
-| **Sprint 3** | Video Streaming Engine (Media3, Range requests, Buffer profile, HUD) | ✅ Completed |
-| **Sprint 4** | Download & Offline Engine (Foreground Service, Range resume, Local preference) | ✅ Completed |
-| **Sprint 5** | Home Screen & Hardening (Continue watching, CircuitBreaker, Housekeeping) | ✅ Completed |
-| **Polish** | Safe Insets (Status Bar), Player Rotation Toggle, Signature LMT Vector Icon | ✅ Completed |
-| **Personal UX Pass** | ±10s seek, Settings screen, persistent preferences, pull-to-refresh, grid view, breadcrumbs, favorites, download failure surfacing | ✅ Completed |
-
----
-
-## 🔒 License & Disclaimer
-
-This software is developed strictly for **personal media streaming** by the owner of the respective Google Drive account.
-* Not affiliated with, sponsored by, or endorsed by Google LLC.
-* All trademarks belong to their respective owners.
+Phần mềm này được viết để **dùng cá nhân** — chỉ dành cho chủ sở hữu tài khoản Google Drive đang đăng nhập.
+* Không liên kết, không được Google bảo trợ hay chứng thực.
+* Các thương hiệu thuộc về chủ sở hữu tương ứng.
