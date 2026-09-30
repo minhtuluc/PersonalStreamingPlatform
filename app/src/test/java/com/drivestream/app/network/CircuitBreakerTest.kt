@@ -76,4 +76,14 @@ class CircuitBreakerTest {
         assertThat(result).isEqualTo("recovered")
         assertThat(circuitBreaker.state).isEqualTo(CircuitBreaker.State.CLOSED)
     }
+    @Test
+    fun cancellingBrowserRequestsDoesNotOpenCircuit() = runTest {
+        val breaker = CircuitBreaker()
+        repeat(CircuitBreaker.DEFAULT_FAILURE_THRESHOLD) {
+            val result = runCatching { breaker.execute { throw kotlinx.coroutines.CancellationException("New query") } }
+            assertThat(result.exceptionOrNull()).isInstanceOf(kotlinx.coroutines.CancellationException::class.java)
+        }
+        assertThat(breaker.execute { "OK" }).isEqualTo("OK")
+    }
+
 }

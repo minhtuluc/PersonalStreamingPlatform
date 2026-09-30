@@ -457,6 +457,10 @@ private fun BrowserFileColumn(
 ) {
     val listState = rememberLazyListState()
 
+    LaunchedEffect(uiState.sortOption) {
+        listState.scrollToItem(0)
+    }
+
     val shouldLoadMore by remember {
         derivedStateOf {
             val totalItems = listState.layoutInfo.totalItemsCount
@@ -465,7 +469,7 @@ private fun BrowserFileColumn(
         }
     }
 
-    LaunchedEffect(shouldLoadMore) {
+    LaunchedEffect(shouldLoadMore, uiState.nextPageToken) {
         if (shouldLoadMore && uiState.nextPageToken != null) {
             onLoadMore()
         }
@@ -518,6 +522,10 @@ private fun BrowserFileGrid(
 ) {
     val gridState = rememberLazyGridState()
 
+    LaunchedEffect(uiState.sortOption) {
+        gridState.scrollToItem(0)
+    }
+
     val shouldLoadMore by remember {
         derivedStateOf {
             val totalItems = gridState.layoutInfo.totalItemsCount
@@ -526,7 +534,7 @@ private fun BrowserFileGrid(
         }
     }
 
-    LaunchedEffect(shouldLoadMore) {
+    LaunchedEffect(shouldLoadMore, uiState.nextPageToken) {
         if (shouldLoadMore && uiState.nextPageToken != null) {
             onLoadMore()
         }

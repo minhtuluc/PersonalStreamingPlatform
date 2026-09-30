@@ -8,6 +8,7 @@ import com.drivestream.app.data.model.GoogleDriveFileListDto
 import com.drivestream.app.data.model.Resolution
 import com.drivestream.app.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -42,7 +43,10 @@ class DriveRemoteDataSource @Inject constructor(
             }
         }.fold(
             onSuccess = { Result.success(it) },
-            onFailure = { Result.failure(AppError.fromThrowable(it)) }
+            onFailure = {
+                if (it is CancellationException) throw it
+                Result.failure(AppError.fromThrowable(it))
+            }
         )
     }
 
@@ -59,7 +63,10 @@ class DriveRemoteDataSource @Inject constructor(
             }
         }.fold(
             onSuccess = { Result.success(it) },
-            onFailure = { Result.failure(AppError.fromThrowable(it)) }
+            onFailure = {
+                if (it is CancellationException) throw it
+                Result.failure(AppError.fromThrowable(it))
+            }
         )
     }
 
@@ -208,7 +215,7 @@ class DriveRemoteDataSource @Inject constructor(
         private const val DRIVE_FILES_ENDPOINT = "https://www.googleapis.com/drive/v3/files"
         private const val DRIVE_FIELDS = "nextPageToken, " +
             "files(id, name, mimeType, size, thumbnailLink, videoMediaMetadata, modifiedTime, shortcutDetails)"
-        const val DEFAULT_PAGE_SIZE = 50
+        const val DEFAULT_PAGE_SIZE = 1000
         const val HTTP_UNAUTHORIZED = 401
         const val HTTP_FORBIDDEN = 403
         const val HTTP_TOO_MANY_REQUESTS = 429

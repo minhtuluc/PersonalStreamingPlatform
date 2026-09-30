@@ -101,6 +101,7 @@ class DriveRemoteDataSourceTest {
         assertThat(video.size).isEqualTo(4294967296L)
         assertThat(video.resolution?.label).isEqualTo("4K")
         assertThat(video.durationMs).isEqualTo(10140000L)
+        assertThat(mockWebServer.takeRequest().requestUrl?.queryParameter("pageSize")).isEqualTo("1000")
     }
 
     @Test

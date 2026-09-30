@@ -70,7 +70,7 @@ class DriveRepositoryTest {
     @Test
     @DisplayName("getFolderFiles returns fresh cached data without remote network call")
     fun getFolderFilesFreshCacheHit() = runTest {
-        val cachedJson = json.encodeToString(sampleFiles)
+        val cachedJson = json.encodeToString(DriveFileList(files = sampleFiles))
         fakeFileCacheDao.saveCache(
             FileCacheEntity(
                 folderId = "root",
@@ -92,7 +92,7 @@ class DriveRepositoryTest {
     fun getFolderFilesCacheMiss() = runTest {
         coEvery {
             mockRemoteDataSource.listFiles("root", null, any())
-        } returns Result.success(DriveFileList(files = sampleFiles, nextPageToken = "token_next"))
+        } returns Result.success(DriveFileList(files = sampleFiles))
 
         val result = repository.getFolderFiles(folderId = "root", forceRefresh = false)
         assertThat(result.isSuccess).isTrue()
@@ -109,7 +109,7 @@ class DriveRepositoryTest {
     @Test
     @DisplayName("getFolderFiles bypasses fresh cache when forceRefresh is true")
     fun getFolderFilesForceRefresh() = runTest {
-        val cachedJson = json.encodeToString(sampleFiles)
+        val cachedJson = json.encodeToString(DriveFileList(files = sampleFiles))
         fakeFileCacheDao.saveCache(
             FileCacheEntity(folderId = "root", filesJson = cachedJson, cachedAt = System.currentTimeMillis())
         )
@@ -131,7 +131,7 @@ class DriveRepositoryTest {
     @Test
     @DisplayName("getFolderFiles falls back to stale cache on network failure")
     fun getFolderFilesOfflineFallback() = runTest {
-        val staleJson = json.encodeToString(sampleFiles)
+        val staleJson = json.encodeToString(DriveFileList(files = sampleFiles))
         fakeFileCacheDao.saveCache(
             FileCacheEntity(
                 folderId = "root",
@@ -147,6 +147,82 @@ class DriveRepositoryTest {
         val result = repository.getFolderFiles(folderId = "root", forceRefresh = false)
         assertThat(result.isSuccess).isTrue()
         assertThat(result.getOrThrow().files).hasSize(2)
+    }
+
+    @Test
+    fun collectsEveryPageBeforeCachingAndReusesCompleteSnapshot() = runTest {
+        val largest = DriveFile("largest", "Z-last.mp4", "video/mp4", size = 9_000_000_000L)
+        coEvery { mockRemoteDataSource.listFiles("root", null, any()) } returns
+            Result.success(DriveFileList(sampleFiles, "page2"))
+        coEvery { mockRemoteDataSource.listFiles("root", "page2", any()) } returns
+            Result.success(DriveFileList(emptyList(), "page3"))
+        coEvery { mockRemoteDataSource.listFiles("root", "page3", any()) } returns
+            Result.success(DriveFileList(listOf(sampleFiles.last(), largest)))
+
+        val result = repository.getFolderFiles("root").getOrThrow()
+        assertThat(result.files.map { it.id }).containsExactly("folder_1", "video_1", "largest").inOrder()
+        assertThat(result.nextPageToken).isNull()
+        assertThat(repository.getFolderFiles("root").getOrThrow()).isEqualTo(result)
+        coVerify(exactly = 1) { mockRemoteDataSource.listFiles("root", null, any()) }
+        coVerify(exactly = 1) { mockRemoteDataSource.listFiles("root", "page3", any()) }
+    }
+
+    @Test
+    fun rejectsLegacyFirstPageCache() = runTest {
+        fakeFileCacheDao.saveCache(
+            FileCacheEntity("root", json.encodeToString(sampleFiles), System.currentTimeMillis())
+        )
+        val complete = sampleFiles + DriveFile("last", "Z.mp4", "video/mp4", size = 9999L)
+        coEvery { mockRemoteDataSource.listFiles("root", null, any()) } returns Result.success(DriveFileList(complete))
+
+        assertThat(repository.getFolderFiles("root").getOrThrow().files).isEqualTo(complete)
+        coVerify(exactly = 1) { mockRemoteDataSource.listFiles("root", null, any()) }
+    }
+
+    @Test
+    fun laterPageFailureDoesNotCachePartialFolder() = runTest {
+        coEvery { mockRemoteDataSource.listFiles("root", null, any()) } returns
+            Result.success(DriveFileList(sampleFiles, "page2"))
+        coEvery { mockRemoteDataSource.listFiles("root", "page2", any()) } returns
+            Result.failure(java.io.IOException("Disconnected"))
+
+        assertThat(repository.getFolderFiles("root").isFailure).isTrue()
+        assertThat(fakeFileCacheDao.getCache("root")).isNull()
+    }
+
+    @Test
+    fun failedRefreshKeepsPreviousCompleteCache() = runTest {
+        val oldCache = FileCacheEntity("root", json.encodeToString(DriveFileList(sampleFiles)), 1L)
+        fakeFileCacheDao.saveCache(oldCache)
+        coEvery { mockRemoteDataSource.listFiles("root", null, any()) } returns
+            Result.success(DriveFileList(emptyList(), "page2"))
+        coEvery { mockRemoteDataSource.listFiles("root", "page2", any()) } returns
+            Result.failure(java.io.IOException("Disconnected"))
+
+        assertThat(repository.getFolderFiles("root", forceRefresh = true).getOrThrow().files).isEqualTo(sampleFiles)
+        assertThat(fakeFileCacheDao.getCache("root")).isEqualTo(oldCache)
+    }
+
+    @Test
+    fun repeatedPageTokenFailsInsteadOfLoopingOrCachingPartialData() = runTest {
+        coEvery { mockRemoteDataSource.listFiles("root", any(), any()) } returns
+            Result.success(DriveFileList(sampleFiles, "repeated"))
+
+        assertThat(repository.getFolderFiles("root").isFailure).isTrue()
+        assertThat(fakeFileCacheDao.getCache("root")).isNull()
+        coVerify(exactly = 2) { mockRemoteDataSource.listFiles("root", any(), any()) }
+    }
+
+    @Test
+    fun searchCollectsAllPagesEvenWhenFirstPageIsEmpty() = runTest {
+        coEvery { mockRemoteDataSource.searchVideos("movie", null, any()) } returns
+            Result.success(DriveFileList(emptyList(), "page2"))
+        coEvery { mockRemoteDataSource.searchVideos("movie", "page2", any()) } returns
+            Result.success(DriveFileList(sampleFiles))
+
+        val result = repository.searchVideos("movie").getOrThrow()
+        assertThat(result.files).isEqualTo(sampleFiles)
+        assertThat(result.nextPageToken).isNull()
     }
 
     @Test

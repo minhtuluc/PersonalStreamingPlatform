@@ -14,11 +14,15 @@ import com.google.common.truth.Truth.assertThat
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -311,4 +315,90 @@ class DriveViewModelTest {
         assertThat(playlistManager.getPlaylist()).hasSize(2)
         assertThat(playlistManager.getPlaylist().map { it.id }).containsExactly("v1", "v2").inOrder()
     }
+    @Test
+    fun sortsLargestFileFromLaterRemotePageAndRestoresItFromCache() = runTest(testDispatcher) {
+        val remote = mockk<com.drivestream.app.network.DriveRemoteDataSource>()
+        val cache = com.drivestream.app.data.DriveRepositoryTest.FakeFileCacheDao()
+        val actualRepository = DriveRepository(remote, cache, kotlinx.serialization.json.Json, testDispatcher)
+        val firstPage = (1..1000).map { DriveFile("v$it", "A$it.mp4", "video/mp4", size = it.toLong()) }
+        val largest = DriveFile("largest", "Z-last.mp4", "video/mp4", size = 9_000_000_000L)
+        coEvery { remote.listFiles("root", null, any()) } returns Result.success(DriveFileList(firstPage, "last"))
+        coEvery { remote.listFiles("root", "last", any()) } returns Result.success(DriveFileList(listOf(largest)))
+        settingsRepository.setSortOption(com.drivestream.app.data.model.FileSortOption.SIZE_DESC)
+        val model = DriveViewModel(actualRepository, SavedStateHandle(), settingsRepository, favoritesRepository)
+        advanceUntilIdle()
+        assertThat(model.uiState.value.files.first()).isEqualTo(largest)
+        assertThat(model.uiState.value.files).hasSize(1001)
+        assertThat(model.uiState.value.nextPageToken).isNull()
+        val reopened = DriveViewModel(actualRepository, SavedStateHandle(), settingsRepository, favoritesRepository)
+        advanceUntilIdle()
+        assertThat(reopened.uiState.value.files.first()).isEqualTo(largest)
+        assertThat(reopened.uiState.value.files).hasSize(1001)
+        coVerify(exactly = 1) { remote.listFiles("root", null, any()) }
+    }
+
+    @Test
+    fun oldFolderRequestCannotOverwriteNewSearch() = runTest(testDispatcher) {
+        val pending = CompletableDeferred<DriveFileList>()
+        coEvery { driveRepository.getFolderFiles("root", null, false) } coAnswers {
+            withContext(NonCancellable) { Result.success(pending.await()) }
+        }
+        val searchFile = DriveFile("search", "New.mp4", "video/mp4")
+        coEvery { driveRepository.searchVideos("New", null) } returns Result.success(DriveFileList(listOf(searchFile)))
+        val model = DriveViewModel(driveRepository, SavedStateHandle(), settingsRepository, favoritesRepository)
+        runCurrent()
+        model.onSearchQueryChange("New")
+        advanceUntilIdle()
+        pending.complete(DriveFileList(sampleFiles))
+        advanceUntilIdle()
+        assertThat(model.uiState.value.files).containsExactly(searchFile)
+        assertThat(model.uiState.value.searchQuery).isEqualTo("New")
+        assertThat(model.uiState.value.isSearching).isTrue()
+    }
+
+    @Test
+    fun refreshDiscardsPendingOldPageAndBlocksAdditionalPagination() = runTest(testDispatcher) {
+        coEvery { driveRepository.getFolderFiles("root", null, false) } returns
+            Result.success(DriveFileList(sampleFiles, "next"))
+        val pending = CompletableDeferred<DriveFileList>()
+        coEvery { driveRepository.getFolderFiles("root", "next", false) } coAnswers {
+            withContext(NonCancellable) { Result.success(pending.await()) }
+        }
+        val refreshed = CompletableDeferred<DriveFileList>()
+        coEvery { driveRepository.getFolderFiles("root", null, true) } coAnswers { Result.success(refreshed.await()) }
+        val model = DriveViewModel(driveRepository, SavedStateHandle(), settingsRepository, favoritesRepository)
+        advanceUntilIdle()
+        model.loadNextPage()
+        model.loadNextPage()
+        runCurrent()
+        model.refresh()
+        model.loadNextPage()
+        runCurrent()
+        assertThat(model.uiState.value.isRefreshing).isTrue()
+        refreshed.complete(DriveFileList(sampleFiles))
+        advanceUntilIdle()
+        pending.complete(DriveFileList(listOf(DriveFile("obsolete", "Old.mp4", "video/mp4"))))
+        advanceUntilIdle()
+        assertThat(model.uiState.value.files).isEqualTo(sampleFiles)
+        assertThat(model.uiState.value.isLoadingMore).isFalse()
+        coVerify(exactly = 1) { driveRepository.getFolderFiles("root", "next", false) }
+    }
+
+    @Test
+    fun sizeSortHasStableTiesAndDoesNotRequestNetworkAgain() = runTest(testDispatcher) {
+        val files = listOf(
+            DriveFile("z", "Z.mp4", "video/mp4", size = 100L),
+            DriveFile("a", "A.mp4", "video/mp4", size = 100L),
+            DriveFile("big", "Big.mp4", "video/mp4", size = 5_000_000_000L)
+        )
+        coEvery { driveRepository.getFolderFiles("root", null, false) } returns Result.success(DriveFileList(files))
+        val model = DriveViewModel(driveRepository, SavedStateHandle(), settingsRepository, favoritesRepository)
+        advanceUntilIdle()
+        model.setSortOption(com.drivestream.app.data.model.FileSortOption.SIZE_DESC)
+        assertThat(model.uiState.value.files.map { it.id }).containsExactly("big", "a", "z").inOrder()
+        model.setSortOption(com.drivestream.app.data.model.FileSortOption.SIZE_ASC)
+        assertThat(model.uiState.value.files.map { it.id }).containsExactly("a", "z", "big").inOrder()
+        coVerify(exactly = 1) { driveRepository.getFolderFiles("root", null, false) }
+    }
+
 }

@@ -14,6 +14,8 @@ import com.drivestream.app.data.model.FileSortOption
 import com.drivestream.app.player.PlayerPlaylistManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 
 @Suppress("TooManyFunctions")
@@ -50,7 +53,9 @@ class DriveViewModel @Inject constructor(
     )
     val uiState: StateFlow<DriveUiState> = _uiState.asStateFlow()
 
-    private var searchJob: Job? = null
+    private var listingJob: Job? = null
+    private var pageJob: Job? = null
+    private var listingGeneration = 0L
 
     init {
         loadFolderFiles(forceRefresh = false)
@@ -72,35 +77,49 @@ class DriveViewModel @Inject constructor(
     }
 
     fun loadFolderFiles(forceRefresh: Boolean = false) {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isLoading = !forceRefresh && it.files.isEmpty(),
-                    isRefreshing = forceRefresh,
-                    errorMessage = null
-                )
-            }
+        startListing(query = "", forceRefresh = forceRefresh)
+    }
 
-            val result = driveRepository.getFolderFiles(
-                folderId = folderId,
-                pageToken = null,
-                forceRefresh = forceRefresh
+    private fun startListing(query: String, forceRefresh: Boolean = false, debounce: Boolean = false) {
+        listingJob?.cancel()
+        pageJob?.cancel()
+        val generation = ++listingGeneration
+        val queryChanged = _uiState.value.searchQuery != query
+        if (queryChanged) rawFiles = emptyList()
+        _uiState.update {
+            it.copy(
+                files = if (queryChanged) emptyList() else it.files,
+                searchQuery = query,
+                isSearching = query.isNotBlank(),
+                isLoading = !forceRefresh || it.files.isEmpty(),
+                isRefreshing = forceRefresh,
+                isLoadingMore = false,
+                nextPageToken = null,
+                errorMessage = null
             )
-
+        }
+        listingJob = viewModelScope.launch {
+            if (debounce) delay(SEARCH_DEBOUNCE_MS)
+            val result = if (query.isNotBlank()) {
+                driveRepository.searchVideos(query = query)
+            } else {
+                driveRepository.getFolderFiles(folderId = folderId, forceRefresh = forceRefresh)
+            }
+            currentCoroutineContext().ensureActive()
+            if (generation != listingGeneration) return@launch
             result.fold(
                 onSuccess = { fileList ->
-                    rawFiles = fileList.files
-                    val sorted = sortFiles(rawFiles, _uiState.value.sortOption)
+                    rawFiles = fileList.files.distinctBy { it.id }
                     _uiState.update {
                         it.copy(
-                            files = sorted,
+                            files = sortFiles(rawFiles, it.sortOption),
                             nextPageToken = fileList.nextPageToken,
                             isLoading = false,
                             isRefreshing = false,
                             errorMessage = null
                         )
                     }
-                    settingsRepository.setLastFolder(folderId, folderName)
+                    if (query.isBlank()) settingsRepository.setLastFolder(folderId, folderName)
                 },
                 onFailure = { error ->
                     _uiState.update {
@@ -118,11 +137,13 @@ class DriveViewModel @Inject constructor(
     fun loadNextPage() {
         val currentState = _uiState.value
         val token = currentState.nextPageToken
-        if (token == null || currentState.isLoadingMore || currentState.isLoading) return
+        if (token == null) return
+        val isBusy = currentState.isLoadingMore || currentState.isLoading || currentState.isRefreshing
+        if (isBusy) return
 
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingMore = true) }
-
+        val generation = listingGeneration
+        _uiState.update { it.copy(isLoadingMore = true) }
+        pageJob = viewModelScope.launch {
             val result = if (currentState.isSearching && currentState.searchQuery.isNotBlank()) {
                 driveRepository.searchVideos(
                     query = currentState.searchQuery,
@@ -136,9 +157,11 @@ class DriveViewModel @Inject constructor(
                 )
             }
 
+            currentCoroutineContext().ensureActive()
+            if (generation != listingGeneration) return@launch
             result.fold(
                 onSuccess = { fileList ->
-                    rawFiles = rawFiles + fileList.files
+                    rawFiles = (rawFiles + fileList.files).distinctBy { it.id }
                     val sorted = sortFiles(rawFiles, _uiState.value.sortOption)
                     _uiState.update {
                         it.copy(
@@ -161,46 +184,7 @@ class DriveViewModel @Inject constructor(
     }
 
     fun onSearchQueryChange(query: String) {
-        _uiState.update { it.copy(searchQuery = query) }
-        searchJob?.cancel()
-
-        if (query.isBlank()) {
-            _uiState.update { it.copy(isSearching = false) }
-            loadFolderFiles(forceRefresh = false)
-            return
-        }
-
-        searchJob = viewModelScope.launch {
-            delay(SEARCH_DEBOUNCE_MS)
-            executeSearch(query)
-        }
-    }
-
-    private suspend fun executeSearch(query: String) {
-        _uiState.update { it.copy(isSearching = true, isLoading = true, errorMessage = null) }
-        val result = driveRepository.searchVideos(query = query)
-        result.fold(
-            onSuccess = { fileList ->
-                rawFiles = fileList.files
-                val sorted = sortFiles(rawFiles, _uiState.value.sortOption)
-                _uiState.update {
-                    it.copy(
-                        files = sorted,
-                        nextPageToken = fileList.nextPageToken,
-                        isLoading = false,
-                        errorMessage = null
-                    )
-                }
-            },
-            onFailure = { error ->
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        errorMessage = error.localizedMessage ?: "Search failed"
-                    )
-                }
-            }
-        )
+        startListing(query = query, debounce = query.isNotBlank())
     }
 
     fun setSortOption(option: FileSortOption) {
@@ -227,20 +211,22 @@ class DriveViewModel @Inject constructor(
     private fun sortFiles(files: List<DriveFile>, option: FileSortOption): List<DriveFile> {
         val (folders, videos) = files.partition { it.isFolder }
         val sortedFolders = when (option) {
-            FileSortOption.NAME_ASC -> folders.sortedBy { it.name.lowercase() }
-            FileSortOption.NAME_DESC -> folders.sortedByDescending { it.name.lowercase() }
+            FileSortOption.NAME_ASC -> folders.sortedBy { it.name.lowercase(Locale.ROOT) }
+            FileSortOption.NAME_DESC -> folders.sortedByDescending { it.name.lowercase(Locale.ROOT) }
             FileSortOption.DATE_DESC -> folders.sortedByDescending { it.modifiedAtEpochMs }
             FileSortOption.DATE_ASC -> folders.sortedBy { it.modifiedAtEpochMs }
-            FileSortOption.SIZE_DESC -> folders.sortedByDescending { it.name.lowercase() }
-            FileSortOption.SIZE_ASC -> folders.sortedBy { it.name.lowercase() }
+            FileSortOption.SIZE_DESC -> folders.sortedBy { it.name.lowercase(Locale.ROOT) }
+            FileSortOption.SIZE_ASC -> folders.sortedBy { it.name.lowercase(Locale.ROOT) }
         }
         val sortedVideos = when (option) {
-            FileSortOption.NAME_ASC -> videos.sortedBy { it.name.lowercase() }
-            FileSortOption.NAME_DESC -> videos.sortedByDescending { it.name.lowercase() }
+            FileSortOption.NAME_ASC -> videos.sortedBy { it.name.lowercase(Locale.ROOT) }
+            FileSortOption.NAME_DESC -> videos.sortedByDescending { it.name.lowercase(Locale.ROOT) }
             FileSortOption.DATE_DESC -> videos.sortedByDescending { it.modifiedAtEpochMs }
             FileSortOption.DATE_ASC -> videos.sortedBy { it.modifiedAtEpochMs }
-            FileSortOption.SIZE_DESC -> videos.sortedByDescending { it.size }
-            FileSortOption.SIZE_ASC -> videos.sortedBy { it.size }
+            FileSortOption.SIZE_DESC -> videos.sortedWith(compareByDescending<DriveFile> { it.size }
+                .thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id })
+            FileSortOption.SIZE_ASC -> videos.sortedWith(compareBy<DriveFile> { it.size }
+                .thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id })
         }
         return sortedFolders + sortedVideos
     }
@@ -251,23 +237,10 @@ class DriveViewModel @Inject constructor(
     }
 
     fun refresh() {
-        if (_uiState.value.isSearching && _uiState.value.searchQuery.isNotBlank()) {
-            viewModelScope.launch {
-                executeSearch(_uiState.value.searchQuery)
-            }
-        } else {
-            loadFolderFiles(forceRefresh = true)
-        }
+        startListing(query = _uiState.value.searchQuery, forceRefresh = true)
     }
 
     fun clearSearch() {
-        searchJob?.cancel()
-        _uiState.update {
-            it.copy(
-                searchQuery = "",
-                isSearching = false
-            )
-        }
         loadFolderFiles(forceRefresh = false)
     }
 

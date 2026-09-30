@@ -44,6 +44,8 @@ class CircuitBreaker @Inject constructor() {
                 onSuccess()
             }
             result
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             mutex.withLock {
                 onFailure(failureThreshold)
